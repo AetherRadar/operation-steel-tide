@@ -35,11 +35,11 @@ Delivered files (all self-contained GLBs with embedded textures):
 
 | Role | File | Size | SHA-256 |
 | --- | --- | ---: | --- |
-| Viper | `viper.glb` | 21,864,596 bytes | `09A33AEC6EA83B52500ED90072DFE8AECE67E790A64EECD690B2EFDD054FA531` |
-| Heron | `heron.glb` | 22,652,672 bytes | `AD86823F01A50AFBE1CE23B45A89DF74BDA25A1DD22B69D146D0B465E5935427` |
-| Lynx | `lynx.glb` | 24,804,160 bytes | `A6927B982B8B8073A5D41266F53795A641CD18F80541630906B16BFFB9C16711` |
-| Magpie | `magpie.glb` | 21,659,412 bytes | `C9A7A2B9EC5EA2019C1F1015181BCA492018B9EE732684F9FEFB92248F3DE0D4` |
-| Jackal | `jackal.glb` | 23,986,088 bytes | `D527DD2005776FFA7C64016972E753AF2510C086957BA9984EB241A7965288F0` |
+| Viper | `viper.glb` | 21,687,844 bytes | `985C33144A7FD8A69506F81886BCA84CE880D2170AEEB572AE7455835B12C994D` |
+| Heron | `heron.glb` | 21,420,252 bytes | `C4CF1FF4310A7340FD13DEA92915F2B020DFB7B9619B6153AED5AA2AEFAD3016` |
+| Lynx | `lynx.glb` | 22,984,376 bytes | `03AB5A06ADD4E38D9EC4CBD828A2CE72E1AC110946139E2DC0790B7AB115E071` |
+| Magpie | `magpie.glb` | 21,225,816 bytes | `1AB991FB165B49FB51AE146A7427E1443EAD9B8D868F2D2F23A7B70AF43B4784` |
+| Jackal | `jackal.glb` | 22,192,312 bytes | `BFD045911A92EE1B1AC34FFCFA2D6C363E492940E58C4AEFD49E4BBA768694D0` |
 
 Rebuild one role (Windows):
 
@@ -49,3 +49,10 @@ blender --background --python scripts/blender/build_hy3d_operator.py -- `
   --rigged <private-tencent-viper-rigged.fbx> `
   --output assets/models/hy3d_operators/viper.glb --triangles 60000
 ```
+
+The checked-in delivery runs `scripts/blender/retarget_hy3d_locomotion.py` and
+`scripts/blender/clean_hy3d_operator_exports.py` after conversion. The first
+bakes the upright CC0 Quaternius walk cycle onto the
+HY-3D leg chains while keeping the torso neutral for runtime two-hand rifle IK;
+the script accepts an existing HY-3D GLB, a matching Quaternius source GLB, and
+an output GLB via `--input`, `--source`, and `--output`.

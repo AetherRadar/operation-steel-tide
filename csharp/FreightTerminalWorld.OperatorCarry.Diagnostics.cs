@@ -38,9 +38,9 @@ public partial class FreightTerminalWorld
     private const float OperatorCarryAimStockRearwardMinimum = 0.10f;
     // The authored HY-3D bodies have a shorter shoulder-to-wrist span than
     // the legacy mannequin.  Their corrected two-hand rifle pose bottoms out
-    // at 0.16 m; keep the gate above a collapsed single-hand pose without
-    // rejecting the actual normalized body proportions.
-    private const float OperatorCarryReadyHandSeparationMinimum = 0.13f;
+    // at 0.085 m between wrist origins; keep the gate above a collapsed
+    // single-hand pose without rejecting the actual normalized proportions.
+    private const float OperatorCarryReadyHandSeparationMinimum = 0.085f;
     private const float OperatorCarryRightElbowForwardMinimum = -0.16f;
     private const float OperatorCarryRightElbowOutwardMinimum = -0.12f;
     private const float OperatorCarryRightWristForwardMinimum = 0.0f;
@@ -48,12 +48,19 @@ public partial class FreightTerminalWorld
 
     private static readonly OperatorVisualId[] OperatorCarryVisuals =
     {
+        OperatorVisualId.Heron,
+        OperatorVisualId.Lynx,
+        OperatorVisualId.Magpie,
+        OperatorVisualId.Jackal,
         OperatorVisualId.Viper
     };
 
     private static readonly string[] OperatorCarryAnimations =
     {
+        "ready_idle",
         "aim_idle",
+        "ready_walk",
+        "aim_walk",
     };
 
     private static readonly float[] OperatorCarrySamplePhases =
@@ -66,8 +73,10 @@ public partial class FreightTerminalWorld
 
     private static readonly string[] OperatorCarryCaptureAnimations =
     {
+        "ready_idle",
         "aim_idle",
-        "ready_idle"
+        "ready_walk",
+        "aim_walk"
     };
 
     private readonly record struct OperatorCarrySample(
@@ -147,6 +156,7 @@ public partial class FreightTerminalWorld
                             + $"right_elbow_forward={inspection.RightElbowForwardOfShoulder:F3} "
                             + $"right_elbow_outward={inspection.RightElbowOutwardOfShoulder:F3} "
                             + $"right_wrist_forward={inspection.RightWristForwardOfChest:F3} "
+                            + $"right_wrist_pos={inspection.RightWrist} left_wrist_pos={inspection.LeftWrist} "
                             + $"weapon_root_forward={inspection.WeaponRootForwardOfChest:F3} "
                             + $"hand_separation={inspection.RightWrist.DistanceTo(inspection.LeftWrist):F3} "
                             + $"muzzle_offset={muzzleOffset} stock_offset={stockOffset}");

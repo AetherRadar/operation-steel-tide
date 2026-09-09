@@ -698,13 +698,12 @@ internal sealed class AuthoredOperatorVisual
         _standingFootClearance = ComputeStandingFootClearance();
         _rightPalmFrame = CombatModelLibrary.FindOptionalNode(root, "RightPalmFrame");
         _leftPalmFrame = CombatModelLibrary.FindOptionalNode(root, "LeftPalmFrame");
-        // Viper's private export contains the marker nodes, but its ready
-        // clips still use the legacy wrist-only contract (the aim clips are
-        // Blender-baked for better starting poses). Let deterministic runtime
-        // IK solve that role's hands; the other HY-3D exports contain complete
-        // authored carry poses and keep their DCC arm frames.
-        _hasAuthoredCarryPose = VisualId != OperatorVisualId.Viper
-            && CombatModelLibrary.FindOptionalNode(root, "SteelTideAuthoredCarryPose") is not null;
+        // The generated HY-3D carry markers are useful measurement points, but
+        // their exported ready/aim clips do not constrain both wrists to the
+        // rifle.  Always let the deterministic two-chain IK solve the hands;
+        // this keeps the rifle in front of the chest and prevents a one-handed
+        // authored clip from pulling it through the torso.
+        _hasAuthoredCarryPose = false;
         // Ready weapons deliberately do not live under a hand BoneAttachment.
         // The attachment/IK feedback loop was the source of the persistent
         // chest and forearm intersections: moving the wrist moved the rifle,
@@ -1359,10 +1358,11 @@ internal sealed class AuthoredOperatorVisual
         // wrist, and finger frames together.  Applying the old runtime torso
         // and neck corrections on top of that pose changes the parent frames
         // under the skin and makes the hand appear to slide off the rifle.
-        if (!_hasAuthoredCarryPose)
-        {
-            ApplyCarryTorsoCorrection(animation);
-        }
+        // The repaired DCC locomotion clips keep the upper body in a neutral
+        // bind pose; rotating the spine again here pushes the support wrist
+        // beyond the foregrip during ready/aim locomotion.  The weapon-first
+        // IK below owns both shoulder chains, so no torso correction is needed
+        // for the HY-3D carry path.
         // Neck/head correction does not change the authored shoulder, arm, or
         // palm frames, and keeps the rifle line below the face in aim clips.
         // Retain it for the DCC carry pose while leaving its arm solve intact.
@@ -1572,7 +1572,6 @@ internal sealed class AuthoredOperatorVisual
         var shoulder = BoneWorldPosition("mixamorig:RightArm");
         var animation = animationOverride ?? AnimationPlayer.CurrentAnimation.ToString();
         var aiming = animation.StartsWith("aim_", StringComparison.Ordinal);
-        var sprinting = animation.EndsWith("_sprint", StringComparison.Ordinal);
         // The stock is the only body contact used to place the rifle. Keep it
         // in the dominant shoulder pocket and move the receiver/barrel ahead
         // of the chest; the hand IK below is derived from the resulting
@@ -1580,9 +1579,7 @@ internal sealed class AuthoredOperatorVisual
         var viperStockDrop = VisualId == OperatorVisualId.Viper ? -0.120f : -0.160f;
         var stockOffset = aiming
             ? new Vector3(0.0f, viperStockDrop, 0.020f)
-            : sprinting
-                ? new Vector3(0.0f, -0.245f, 0.035f)
-                : new Vector3(0.0f, VisualId == OperatorVisualId.Viper ? -0.120f : -0.160f, 0.030f);
+            : new Vector3(0.0f, VisualId == OperatorVisualId.Viper ? -0.120f : -0.160f, 0.030f);
         var global = _weapon.Root.GlobalTransform;
         var stockDelta = _weapon.Stock.GlobalPosition - global.Origin;
         // Keep the stock near the shoulder, but place the receiver/barrel in
@@ -1593,9 +1590,18 @@ internal sealed class AuthoredOperatorVisual
         // armor is deeper than the legacy mannequin, so the old 6 cm
         // presentation offset let the magazine well visually sink into the
         // torso even when both palm contacts were valid.
-        var presentationForwardDistance = VisualId == OperatorVisualId.Viper
-            ? -0.100f
-            : -0.060f;
+        var locomotion = animation.EndsWith("_walk", StringComparison.Ordinal)
+            || animation.EndsWith("_run", StringComparison.Ordinal)
+            || animation.EndsWith("_sprint", StringComparison.Ordinal);
+        // During locomotion the repaired lower-body cycle leaves the support
+        // shoulder slightly lower. Pull the rifle back toward the torso so
+        // the foregrip remains inside the left arm's natural reach while the
+        // muzzle still stays clearly ahead of the chest.
+        var presentationForwardDistance = locomotion && VisualId != OperatorVisualId.Viper
+            ? 0.050f
+            : VisualId == OperatorVisualId.Viper
+                ? -0.100f
+                : -0.060f;
         var presentationForward = actorBasis * new Vector3(0.0f, 0.0f, presentationForwardDistance);
         global.Origin = shoulder + actorBasis * stockOffset
             + presentationForward
@@ -1758,7 +1764,14 @@ internal sealed class AuthoredOperatorVisual
     {
         if (VisualId != OperatorVisualId.Viper)
         {
-            return (weapon.ForegripContact ?? weapon.Foregrip).GlobalPosition;
+            // The current M4A1 foregrip marker is centered on the rail.  The
+            // normalized HY-3D operators reach the rear half of that grip;
+            // keeping the contact there prevents the support arm from
+            // stretching toward the muzzle while retaining visible geometry
+            // between the palm and the handguard.
+            return (weapon.ForegripContact ?? weapon.Foregrip).GlobalPosition
+                + weapon.Root.GlobalTransform.Basis.Orthonormalized()
+                    * new Vector3(0.0f, 0.0f, 0.180f);
         }
 
         // The Viper forearm reaches the rear half of the 20 cm foregrip. Keep
