@@ -11,6 +11,7 @@ public partial class FreightTerminalWorld
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         AuthoredOperatorVisual? visual = null;
         var transitions = new System.Collections.Generic.List<string>();
+        var uprightTransitions = new System.Collections.Generic.List<string>();
         var sockets = false;
         var weaponSocketPosition = Vector3.Zero;
         var backWeaponSocketPosition = Vector3.Zero;
@@ -42,6 +43,22 @@ public partial class FreightTerminalWorld
                 animator.Update(0.25f, speed, weaponReadied, prone, crouched, aiming, downed, reviving, dead);
                 transitions.Add(animator.CurrentAnimation);
             }
+            void SampleUpright(float speed, bool weaponReadied, bool aiming)
+            {
+                animator.Update(
+                    0.25f,
+                    speed,
+                    weaponReadied,
+                    prone: false,
+                    crouched: false,
+                    aiming: aiming,
+                    downed: false,
+                    reviving: false,
+                    dead: false,
+                    airborne: false,
+                    preferUprightLocomotion: true);
+                uprightTransitions.Add(animator.CurrentAnimation);
+            }
             Sample(0.0f, false, false, false, false, false, false, false);
             Sample(0.0f, true, false, false, false, false, false, false);
             Sample(0.0f, true, false, false, true, false, false, false);
@@ -69,6 +86,13 @@ public partial class FreightTerminalWorld
             animator.PlayRevived();
             transitions.Add(animator.CurrentAnimation);
             animator.Update(0.7f, 0.0f, false, false, false, false, false, false, false);
+            animator.SetRestingPose(false);
+            SampleUpright(1.5f, false, false);
+            SampleUpright(3.4f, false, false);
+            SampleUpright(1.5f, true, false);
+            SampleUpright(3.4f, true, false);
+            SampleUpright(1.5f, true, true);
+            SampleUpright(3.4f, true, true);
             Sample(0.0f, false, false, false, false, false, false, true);
             sockets = IsInstanceValid(visual.WeaponSocket)
                 && IsInstanceValid(visual.BackWeaponSocket)
@@ -146,6 +170,11 @@ public partial class FreightTerminalWorld
             unarmedUprightExpected[5] = "run";
             transitionsValid = transitions.SequenceEqual(unarmedUprightExpected);
         }
+        var expectedUprightTransitions = new[]
+        {
+            "walk", "run", "ready_walk", "ready_run", "aim_walk", "aim_run"
+        };
+        var uprightTransitionsValid = uprightTransitions.SequenceEqual(expectedUprightTransitions);
         var readyDistinct = readyIdleFit.WeaponOrigin.Y <= rifleFit.WeaponOrigin.Y - 0.18f;
         var readyForwardAligned = Mathf.Abs(readyIdleFit.MuzzleOffset.X) <= 0.16f
             && readyIdleFit.MuzzleOffset.Z <= -0.38f;
@@ -156,6 +185,7 @@ public partial class FreightTerminalWorld
             && actionCoverage
             && fingerRigCoverage
             && transitionsValid
+            && uprightTransitionsValid
             && rifleFit.Valid
             && movementRifleFitValid
             && readyDistinct
@@ -174,7 +204,10 @@ public partial class FreightTerminalWorld
             + $"muzzle_offset={rifleFit.MuzzleOffset} stock_offset={rifleFit.StockOffset} "
             + $"action_count={actionCount} action_coverage={actionCoverage} "
             + $"finger_bones={fingerBoneCount} finger_rig_coverage={fingerRigCoverage} "
-            + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)}");
+            + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)} "
+            + $"upright_transitions={string.Join('>', uprightTransitions)} "
+            + $"upright_expected={string.Join('>', expectedUprightTransitions)} "
+            + $"upright_transitions_valid={uprightTransitionsValid}");
         GD.Print($"OPERATOR_ANIMATIONS_PASS valid={valid}");
         visual?.Root.QueueFree();
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);
