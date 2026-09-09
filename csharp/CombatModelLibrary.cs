@@ -698,12 +698,16 @@ internal sealed class AuthoredOperatorVisual
         _standingFootClearance = ComputeStandingFootClearance();
         _rightPalmFrame = CombatModelLibrary.FindOptionalNode(root, "RightPalmFrame");
         _leftPalmFrame = CombatModelLibrary.FindOptionalNode(root, "LeftPalmFrame");
-        // The generated HY-3D carry markers are useful measurement points, but
-        // their exported ready/aim clips do not constrain both wrists to the
-        // rifle.  Always let the deterministic two-chain IK solve the hands;
-        // this keeps the rifle in front of the chest and prevents a one-handed
-        // authored clip from pulling it through the torso.
-        _hasAuthoredCarryPose = false;
+        var authoredCarrySocket = CombatModelLibrary.FindOptionalNode(root, "RifleCarrySocket");
+        // HY-3D carry clips are authored in Blender with the rifle socket and
+        // palm frames in the same reference pose as the skinned hands. When
+        // those required authored frames are present, the runtime only follows
+        // them; procedural arm IK would put a second transform on the already
+        // posed mesh and recreate the hand/weapon intersections this asset
+        // pipeline is intended to eliminate.
+        _hasAuthoredCarryPose = authoredCarrySocket is not null
+            && CombatModelLibrary.FindOptionalNode(root, "RightPalmFrame") is not null
+            && CombatModelLibrary.FindOptionalNode(root, "LeftPalmFrame") is not null;
         // Ready weapons deliberately do not live under a hand BoneAttachment.
         // The attachment/IK feedback loop was the source of the persistent
         // chest and forearm intersections: moving the wrist moved the rifle,
@@ -711,14 +715,28 @@ internal sealed class AuthoredOperatorVisual
         // anchor for the deterministic weapon-first solve below.
         _carryWeaponAnchor = new Node3D { Name = "RuntimeCarryWeaponAnchor" };
         Root.AddChild(_carryWeaponAnchor);
-        WeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeWeaponSocket", "mixamorig:RightHand");
+        var weaponSocketBone = _hasAuthoredCarryPose ? "mixamorig:Spine2" : "mixamorig:RightHand";
+        var weaponAttachment = CreateBoneAttachment(_skeleton, "RuntimeWeaponSocket", weaponSocketBone);
+        WeaponSocket = weaponAttachment;
         if (CombatModelLibrary.UsesHy3dOperator(visualId)
-            && CombatModelLibrary.FindOptionalNode(root, "WeaponSocket") is { } authoredWeaponSocket)
+            && (authoredCarrySocket ?? CombatModelLibrary.FindOptionalNode(root, "WeaponSocket")) is { } authoredWeaponSocket)
         {
-            // Tencent's authored socket is placed at the palm/finger contact,
-            // not at the wrist-bone origin. Copy its local offset onto the
-            // runtime BoneAttachment so the rifle grip lands in the hand.
-            WeaponSocket.Position = authoredWeaponSocket.Position;
+            // Copy the complete authored local frame, including the normalized
+            // weapon scale. A spine-parented carry socket keeps the rifle
+            // stable while the two hand bones animate independently.
+            if (_hasAuthoredCarryPose)
+            {
+                var authoredFrame = new Node3D { Name = "RuntimeWeaponSocketFrame" };
+                weaponAttachment.AddChild(authoredFrame);
+                authoredFrame.Position = authoredWeaponSocket.Position;
+                authoredFrame.Quaternion = authoredWeaponSocket.Quaternion;
+                authoredFrame.Scale = authoredWeaponSocket.Scale;
+                WeaponSocket = authoredFrame;
+            }
+            else
+            {
+                WeaponSocket.Position = authoredWeaponSocket.Position;
+            }
         }
         BackWeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeBackWeaponSocket", "mixamorig:Spine2");
         HeadSocket = CombatModelLibrary.RequireNode(root, "HeadSocket");
@@ -1354,6 +1372,16 @@ internal sealed class AuthoredOperatorVisual
         _skeleton.ForceUpdateAllBoneTransforms();
 #pragma warning restore CS0618
         RefreshAuthoredPalmFrames();
+        if (CombatModelLibrary.UsesHy3dOperator(VisualId) && _hasAuthoredCarryPose)
+        {
+            // The GLB owns the upper-body pose, palm contacts, and rifle root.
+            // Reparenting the weapon is the only runtime operation needed.
+            ApplyWeaponSocketTransform(
+                readied: true,
+                dynamicCarry: true,
+                animationOverride: animation);
+            return;
+        }
         // A DCC-authored carry pose already contains the shoulder, elbow,
         // wrist, and finger frames together.  Applying the old runtime torso
         // and neck corrections on top of that pose changes the parent frames
@@ -1466,9 +1494,10 @@ internal sealed class AuthoredOperatorVisual
             return;
         }
         var isHy3d = readied && CombatModelLibrary.UsesHy3dOperator(VisualId);
+        var authoredCarry = isHy3d && dynamicCarry && _hasAuthoredCarryPose;
         var socket = readied
             ? dynamicCarry && isHy3d
-                ? _carryWeaponAnchor
+                ? authoredCarry ? WeaponSocket : _carryWeaponAnchor
                 : WeaponSocket
             : BackWeaponSocket;
         if (_weapon.Root.GetParent() != socket)
@@ -1476,7 +1505,7 @@ internal sealed class AuthoredOperatorVisual
             _weapon.Root.Reparent(socket, keepGlobalTransform: false);
         }
         _weapon.Root.Position = Vector3.Zero;
-        if (!(dynamicCarry && isHy3d))
+        if (!authoredCarry && !(dynamicCarry && isHy3d))
         {
             _weapon.Root.Quaternion = readied
                 ? CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId)
@@ -1495,6 +1524,16 @@ internal sealed class AuthoredOperatorVisual
             // transitions.
             dynamicAttachment.OnSkeletonUpdate();
         }
+        else if (authoredCarry
+            && socket.GetParent() is BoneAttachment3D authoredAttachment
+            && GodotObject.IsInstanceValid(authoredAttachment))
+        {
+            // The authored frame is a child of the Spine2 attachment.  Refresh
+            // that parent explicitly after an animation seek so a small
+            // authored aim lean moves the weapon with the chest instead of
+            // leaving the previous ready position cached for one frame.
+            authoredAttachment.OnSkeletonUpdate();
+        }
         var socketRelativeToRoot = TransformRelativeToAncestor(socket, Root);
         var inheritedScale = Mathf.Max(0.0001f, socketRelativeToRoot.Basis.Scale.X);
         // HY-3D's normalized bodies have a slightly shorter forearm span than
@@ -1503,6 +1542,16 @@ internal sealed class AuthoredOperatorVisual
         // authored rifle silhouette and muzzle distance for both ready and aim.
         var weaponScale = isHy3d ? 0.40f : FieldWeaponScale;
         _weapon.Root.Scale = Vector3.One * (weaponScale / inheritedScale);
+        if (authoredCarry)
+        {
+            // RifleCarrySocket already carries the Blender-authored basis and
+            // scale. Keep the weapon at the socket origin for every sampled
+            // ready/aim clip; no runtime pose compensation is allowed on this
+            // production character asset.
+            _weapon.Root.Position = Vector3.Zero;
+            _weapon.Root.Quaternion = Quaternion.Identity;
+            return;
+        }
         if (readied && CombatModelLibrary.UsesQuaterniusOperatorRig(VisualId)
             && !(dynamicCarry && isHy3d))
         {
@@ -1993,16 +2042,6 @@ internal sealed class AuthoredOperatorVisual
         var direction = shoulderToTarget.Normalized();
         var requestedDistance = shoulderToTarget.Length();
         var rawReach = proximalLength + distalLength;
-        // A few HY-3D bodies have a 3–7% shorter forearm span than the
-        // normalized rifle.  Let the presentation chain stretch a small,
-        // bounded amount instead of pulling the support hand off the
-        // foregrip.  The fallback target nudge below handles any pose that
-        // would require a visibly excessive stretch.
-        // Never scale a skinned bone chain at runtime.  Godot's pose
-        // rotation API keeps child translations at their bind lengths, so a
-        // nominal "stretch" only rotates the elbow toward a point the mesh
-        // cannot reach and leaves the sleeve or glove behind.  Clamp the
-        // endpoint a few millimetres inside the natural reach instead.
         const float reachMargin = 0.012f;
         var solvedProximalLength = proximalLength;
         var solvedDistalLength = distalLength;

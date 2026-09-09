@@ -19,6 +19,13 @@ being swallowed by the rifle. Existing finger chains are preserved when the
 private source already contains them; wrist-only HY-3D responses receive the
 fallback chains during this Blender build.
 
+The five delivered operators now carry a Blender-authored two-hand M4A1 pose:
+`RifleCarrySocket` is parented to `Spine2`, while `RightPalmFrame` and
+`LeftPalmFrame` follow the actual hand bones. The rifle cant, stock pocket,
+both arm chains, and a small aim lean are baked in Blender; Godot only follows
+the authored socket and does not run corrective arm IK for these assets. The
+editable source scenes are `source_art/hy3d_operators/{viper,heron,lynx,magpie,jackal}.blend`.
+
 The delivered Viper also carries bone-parented `LeftPalmFrame`,
 `RightPalmFrame`, `LeftWristFrame`, `RightWristFrame`, shoulder frames,
 `ChestClearanceFrame`, and `HeadBaseFrame` landmarks. These are authored in the
@@ -35,11 +42,11 @@ Delivered files (all self-contained GLBs with embedded textures):
 
 | Role | File | Size | SHA-256 |
 | --- | --- | ---: | --- |
-| Viper | `viper.glb` | 21,687,844 bytes | `985C33144A7FD8A69506F81886BCA84CE880D2170AEEB572AE7455835B12C994D` |
-| Heron | `heron.glb` | 21,420,252 bytes | `C4CF1FF4310A7340FD13DEA92915F2B020DFB7B9619B6153AED5AA2AEFAD3016` |
-| Lynx | `lynx.glb` | 22,984,376 bytes | `03AB5A06ADD4E38D9EC4CBD828A2CE72E1AC110946139E2DC0790B7AB115E071` |
-| Magpie | `magpie.glb` | 21,225,816 bytes | `1AB991FB165B49FB51AE146A7427E1443EAD9B8D868F2D2F23A7B70AF43B4784` |
-| Jackal | `jackal.glb` | 22,192,312 bytes | `BFD045911A92EE1B1AC34FFCFA2D6C363E492940E58C4AEFD49E4BBA768694D0` |
+| Viper | `viper.glb` | 21,687,648 bytes | `CD454A45AAD26D359964A14DC9D513CDF7B030DAC550A4F71B7E6F3D63D728B5` |
+| Heron | `heron.glb` | 21,433,124 bytes | `81A190D7C4F54E4D8381E7E647A674799F4BEB06F3ED3A2C4B1283B522C8539F` |
+| Lynx | `lynx.glb` | 22,709,020 bytes | `2F8256A0E424FF7C1BA9C12B121FAF77C7A7E49E939EC55044EE13B4C96A0091` |
+| Magpie | `magpie.glb` | 21,021,256 bytes | `A12EC3C48C46A7F63AF3E1FE064D56EFB9BBA94446DB5C08A12BAB17952AFAFC` |
+| Jackal | `jackal.glb` | 21,915,992 bytes | `088ACE1CCA20E4CF708670B8E551DA213055D93B23935FD012A7E8BC5E7F4173` |
 
 Rebuild one role (Windows):
 
