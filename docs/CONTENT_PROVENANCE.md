@@ -387,3 +387,5 @@ The root MIT license covers project-authored material only. It does not relicens
 ## Maintainer checklist
 
 When adding a binary asset, record its creator, source URL, exact license, and any attribution requirement before commit. When replacing an asset, remove stale attribution entries. Keep promotional media traceable to an in-engine capture command or another documented source.
+
+| Residential Life Cluster | Project-authored in Blender 4.5 from `scripts/blender/build_residential_life_cluster.py`, with disclosed AI assistance. The scene was modeled as a new standalone composition: a four-floor apartment, supermarket hall, three neighborhood storefronts, pedestrian plaza, loading dock, signage, planters, benches, and lighting. | Project-authored geometry, materials, layout, and build code are released under the root MIT license | Editable source: `source_art/world/residential_life_cluster/residential_life_cluster.blend`; runtime: `assets/models/residential_life_cluster/residential_life_cluster.glb`; built 2026-09-09 with Blender 4.5.10; no third-party raw model is embedded |

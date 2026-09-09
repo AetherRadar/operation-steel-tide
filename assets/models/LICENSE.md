@@ -1438,3 +1438,14 @@ Quaternius Universal Animation Library and Universal Animation Library 2:
 The checked-in standard exports are the root-motion-disabled versions. The
 retargeting script keeps navigation in Godot authoritative and uses Blender
 to add prone/downed integration, recovery poses, and attachment sockets.
+
+## Residential Life Cluster
+
+`residential_life_cluster/residential_life_cluster.glb` is a project-authored Blender 4.5 composition built from scratch for the residential survival map. It contains a four-floor apartment block, Northstar Market supermarket, three storefronts, a pedestrian plaza, loading dock, signage, planters, benches, and lighting.
+
+- Creator: Operation Steel Tide project, with disclosed AI assistance
+- Source: `../../source_art/world/residential_life_cluster/residential_life_cluster.blend`
+- Reproducible build: `../../scripts/blender/build_residential_life_cluster.py`
+- Runtime mapping: `residential_life_cluster/residential_life_cluster.glb`
+- License: project-authored composition under the root MIT license
+- Acquisition/build date: 2026-09-09

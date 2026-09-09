@@ -207,6 +207,7 @@ public partial class FreightTerminalWorld
         _residentialChestEventCount = 0;
         _residentialGuardAmbushSpawnCount = 0;
         _residentialEncounterController = CreateResidentialRoomEncounterController();
+        BuildResidentialLifeCluster(community);
         var diagnosticArgs = OS.GetCmdlineUserArgs();
         _residentialLootSeedSalt = diagnosticArgs.Contains("--validate-residential-gameplay")
             || diagnosticArgs.Contains("--validate-medical")
