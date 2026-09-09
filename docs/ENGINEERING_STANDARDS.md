@@ -10,6 +10,12 @@ These rules define the maintainability baseline for Operation Steel Tide. They a
 - Behavior migrations MUST be incremental: move one coherent subsystem per commit and keep the project runnable after each commit. Do not combine a broad rewrite with unrelated gameplay work.
 - Diagnostic-only behavior MUST remain behind an explicit diagnostic argument and MUST NOT alter normal play.
 
+## Blender authored art
+
+- Every visible character, building, vehicle, and major prop MUST be created or corrected in Blender and delivered as an authored `.blend` plus exported `.glb`/`.gltf` asset. Blender is the required source of truth for mesh shape, proportions, rigging, skin weights, animation retargeting, sockets, and equipment placement.
+- C#, GDScript, Godot scene edits, runtime transforms, procedural primitives, and generated meshes MUST NOT be used to reshape, rescale, re-pose, re-rig, or visually repair an authored asset. If a model is wrong in-game, fix the Blender source and re-export it.
+- Runtime code MAY select an authored asset and apply gameplay state such as visibility or animation playback, but MUST NOT compensate for an art or rig defect with geometry or pose adjustments.
+
 ## Dependency direction
 
 Production dependencies MUST flow in this direction:
