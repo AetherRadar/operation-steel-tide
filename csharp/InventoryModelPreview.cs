@@ -349,7 +349,7 @@ public partial class InventoryModelPreview : SubViewportContainer
 
     private void BuildOperator(Node3D root)
     {
-        InventoryOperatorPreviewRecovery.Build(
+        InventoryOperatorPreviewBuilder.Build(
             root,
             OperatorRoles.Spec(_operatorRole).VisualId,
             _weapon,
@@ -828,3 +828,4 @@ public partial class InventoryModelPreview : SubViewportContainer
         return part;
     }
 }
+

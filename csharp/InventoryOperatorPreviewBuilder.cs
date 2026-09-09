@@ -6,7 +6,7 @@ namespace OperationSteelTide;
 /// Builds the requested authored operator preview. Required assets fail at
 /// their owner; no alternate visual or silent recovery path is permitted.
 /// </summary>
-internal static class InventoryOperatorPreviewRecovery
+internal static class InventoryOperatorPreviewBuilder
 {
     public static void Build(
         Node3D root,
@@ -46,3 +46,4 @@ internal static class InventoryOperatorPreviewRecovery
         root.AddChild(previewRoot);
     }
 }
+
