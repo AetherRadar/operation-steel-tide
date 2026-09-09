@@ -2,9 +2,10 @@
 
 These rules define the maintainability baseline for Operation Steel Tide. They apply to new production code and to any subsystem touched by a refactor. `MUST` rules are release gates. `SHOULD` rules require a short explanation in the commit or pull request when they are intentionally not followed.
 
-## Compatibility contract
+## Compatibility prohibition
 
-- Refactors MUST preserve save-file keys and formats, input actions and default bindings, mission rules, spawn and cold-start loadout behavior, network messages, public signals, and existing `--validate-*` / `--capture-*` command names unless a task explicitly changes that contract.
+- Production code MUST NOT contain compatibility facades, legacy branches, fallback assets, silent recovery paths, or adapters for superseded contracts. A missing required asset, node, field, or message MUST fail explicitly at its owner.
+- Existing compatibility code MUST be removed as part of the first change that touches its subsystem. Do not add new callers, tests, or data formats that preserve a superseded contract.
 - A refactor MUST pass `dotnet build OperationSteelTide.csproj` with zero warnings and zero errors plus every diagnostic named by `AGENTS.md` for the affected subsystem.
 - Behavior migrations MUST be incremental: move one coherent subsystem per commit and keep the project runnable after each commit. Do not combine a broad rewrite with unrelated gameplay work.
 - Diagnostic-only behavior MUST remain behind an explicit diagnostic argument and MUST NOT alter normal play.
@@ -23,12 +24,12 @@ scene / composition root
 - Data contracts and pure gameplay rules MUST NOT depend on Godot `Node`, UI controls, scene paths, or a composition root.
 - Feature controllers MAY depend on focused interfaces or domain types. They MUST NOT reach into another feature's private state or search the global scene tree for an implementation detail.
 - UI views MUST expose user intent through signals, events, or explicit callbacks. They MUST NOT directly mutate world, player, persistence, networking, or mission state.
-- `FreightTerminalWorld` is a composition root and compatibility facade during migration. New world generation, mission coordination, spawning, extraction, networking, or persistence logic MUST be introduced in a focused service instead of adding another responsibility to `FreightTerminalWorld.cs`.
-- `CombatHUD` is a compatibility facade during migration. New interface surfaces MUST use a dedicated scene and controller/view type instead of adding static node construction to `CombatHUD.cs`.
+- `FreightTerminalWorld` is a composition root. New world generation, mission coordination, spawning, extraction, networking, or persistence logic MUST be introduced in a focused service instead of adding another responsibility to `FreightTerminalWorld.cs`.
+- `CombatHUD` is a composition root for existing scenes. New interface surfaces MUST use a dedicated scene and controller/view type instead of adding static node construction to `CombatHUD.cs`.
 
 ## File and type boundaries
 
-- A C# `partial` file MAY group legacy members of one aggregate while it is being migrated. It MUST NOT be treated as a module boundary: all partial files still share state and lifecycle.
+- A C# `partial` file MAY group members of one aggregate. It MUST NOT preserve superseded members as a compatibility layer or be treated as a module boundary: all partial files still share state and lifecycle.
 - New production C# files SHOULD stay at or below 500 lines. A file above 800 lines MUST include a documented reason and a concrete extraction follow-up before merge.
 - A type SHOULD have one lifecycle owner and one primary reason to change. State used only by one feature belongs with that feature, not in a shared root.
 - Cross-feature access MUST use the narrowest stable API. Do not make fields public or internal only to avoid defining an explicit input, result, event, or interface.
@@ -38,7 +39,7 @@ scene / composition root
 
 - Static UI hierarchy, anchors, offsets, minimum sizes, colors, and theme overrides MUST live in `.tscn` or shared `.tres` resources. C# MAY create dynamic rows, world-driven markers, previews, and other data-dependent children.
 - Every reusable UI scene SHOULD have a focused controller/view class that binds its own required nodes, owns presentation updates, and emits user-intent signals. The composition root is responsible only for instantiation, connection, and supplying state.
-- Required scene nodes MUST use stable unique names and typed `GetNode<T>` bindings. Optional nodes MAY use `GetNodeOrNull<T>` with an explicit fallback.
+- Required scene nodes MUST use stable unique names and typed `GetNode<T>` bindings. Missing required nodes MUST fail during scene construction; `GetNodeOrNull<T>` MUST NOT be used to provide compatibility fallbacks.
 - A view MUST document its inputs, output signals, and lifecycle in its public API. Showing or hiding a view MUST NOT implicitly save settings or change gameplay state.
 - Every newly extracted UI scene MUST have a deterministic `--validate-*` diagnostic that verifies scene loading, required bindings, data synchronization without feedback signals, localization where applicable, and user-intent signals.
 
@@ -63,7 +64,7 @@ scene / composition root
 
 Before merging a feature or refactor, verify:
 
-1. The change preserves every compatibility item not explicitly changed by the task.
+1. The change contains no compatibility facade, legacy branch, fallback asset, or silent recovery path.
 2. Static UI is editor-visible and dynamic UI creation is justified by data.
 3. No new responsibility was added to `FreightTerminalWorld.cs` or `CombatHUD.cs`.
 4. Dependencies point toward domain rules rather than back toward the scene tree.

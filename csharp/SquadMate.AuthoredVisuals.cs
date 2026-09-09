@@ -141,28 +141,18 @@ public partial class SquadMate
 
     private void AttachAuthoredOperatorVisual()
     {
-        AuthoredOperatorVisual? authoredOperator = null;
-        try
-        {
-            authoredOperator = CombatModelLibrary.InstantiateOperator(
-                OperatorRoles.Spec(Role).VisualId,
-                weaponBuild: HasFireablePrimary ? CarriedWeapon : null,
-                attachDefaultWeapon: false,
-                helmet: EquippedHelmet,
-                bodyArmor: EquippedBodyArmor,
-                backpack: EquippedBackpack);
-            _rig.AddChild(authoredOperator.Root);
-            var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
-            _authoredOperatorVisual = authoredOperator;
-            _authoredOperatorAnimator = authoredAnimator;
-            _authoredCarriedWeaponPlatform = CarriedWeapon.Platform;
-        }
-        catch (Exception exception)
-        {
-            authoredOperator?.Root.QueueFree();
-            GD.PushWarning($"Authored squad operator unavailable; retaining procedural visual: {exception.Message}");
-            return;
-        }
+        var authoredOperator = CombatModelLibrary.InstantiateOperator(
+            OperatorRoles.Spec(Role).VisualId,
+            weaponBuild: HasFireablePrimary ? CarriedWeapon : null,
+            attachDefaultWeapon: false,
+            helmet: EquippedHelmet,
+            bodyArmor: EquippedBodyArmor,
+            backpack: EquippedBackpack);
+        _rig.AddChild(authoredOperator.Root);
+        var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
+        _authoredOperatorVisual = authoredOperator;
+        _authoredOperatorAnimator = authoredAnimator;
+        _authoredCarriedWeaponPlatform = CarriedWeapon.Platform;
         var children = _rig.GetChildren();
         using var childrenBacking = children.AsDisposable();
         foreach (var child in children)

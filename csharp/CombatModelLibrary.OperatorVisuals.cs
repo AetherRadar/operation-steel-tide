@@ -5,7 +5,6 @@ namespace OperationSteelTide;
 
 internal static partial class CombatModelLibrary
 {
-    private const string QuaterniusOperatorRoot = "res://assets/models/quaternius_operators";
     private const string Hy3dOperatorRoot = "res://assets/models/hy3d_operators";
 
     private readonly record struct OperatorVisualAssetSpec(
@@ -45,24 +44,11 @@ internal static partial class CombatModelLibrary
             _ => "viper"
         };
         var hy3dPath = $"{Hy3dOperatorRoot}/{slug}.glb";
-        if (ResourceLoader.Exists(hy3dPath))
-        {
-            return new OperatorVisualAssetSpec(
-                hy3dPath,
-                hy3dPath,
-                Hy3dOperatorNodes,
-                Hy3dOperatorNodes,
-                UsesQuaterniusRig: true);
-        }
-
-        // Keep a clean-checkout fallback while the generated Tencent files
-        // remain private pending redistribution/license confirmation.
-        var path = $"{QuaterniusOperatorRoot}/{slug}.glb";
         return new OperatorVisualAssetSpec(
-            path,
-            path,
-            QuaterniusOperatorNodes,
-            QuaterniusOperatorNodes,
+            hy3dPath,
+            hy3dPath,
+            Hy3dOperatorNodes,
+            Hy3dOperatorNodes,
             UsesQuaterniusRig: true);
     }
 
@@ -84,7 +70,7 @@ internal static partial class CombatModelLibrary
             OperatorVisualId.Jackal => "jackal",
             _ => "viper"
         };
-        return ResourceLoader.Exists($"{Hy3dOperatorRoot}/{slug}.glb");
+        return true;
     }
 
     /// <summary>
