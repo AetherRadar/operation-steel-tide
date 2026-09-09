@@ -17,7 +17,7 @@ def mat(name, color, metallic=0.0, rough=0.7, emission=None):
         bs.inputs['Emission Color'].default_value=(*emission,1); bs.inputs['Emission Strength'].default_value=2.0
     return m
 
-concrete=mat('Concrete',(0.34,0.38,0.4),rough=.9); brick=mat('Warm Brick',(0.46,0.22,0.16),rough=.85); glass=mat('Blue Glass',(0.08,0.24,0.3),metallic=.35,rough=.18); frame=mat('Window Frames',(0.05,0.07,0.08),metallic=.7,rough=.25); roof=mat('Roof Metal',(0.12,0.15,0.16),metallic=.75,rough=.35); asphalt=mat('Plaza Asphalt',(0.08,0.1,0.11),rough=.95); tile=mat('Plaza Tile',(0.32,0.38,0.35),rough=.8); accent=mat('Shop Accent',(0.8,0.42,0.12),rough=.5); green=mat('Planter Green',(0.12,0.3,0.18),rough=.9); wood=mat('Bench Wood',(0.28,0.14,0.07),rough=.8); light=mat('Interior Light',(1.0,0.55,0.2),emission=(1.0,.28,.08),rough=.35)
+concrete=mat('Concrete',(0.34,0.38,0.4),rough=.9); brick=mat('Warm Brick',(0.46,0.22,0.16),rough=.85); glass=mat('Blue Glass',(0.08,0.24,0.3),metallic=.35,rough=.18); frame=mat('Window Frames',(0.05,0.07,0.08),metallic=.7,rough=.25); roof=mat('Roof Metal',(0.12,0.15,0.16),metallic=.75,rough=.35); asphalt=mat('Plaza Asphalt',(0.08,0.1,0.11),rough=.95); tile=mat('Plaza Tile',(0.32,0.38,0.35),rough=.8); accent=mat('Shop Accent',(0.8,0.42,0.12),rough=.5); green=mat('Planter Green',(0.12,0.3,0.18),rough=.9); wood=mat('Bench Wood',(0.28,0.14,0.07),rough=.8); light=mat('Interior Light',(1.0,0.55,0.2),emission=(1.0,.28,.08),rough=.35); warning=mat('Emergency Red',(0.55,0.03,0.02),emission=(0.9,.01,.005),rough=.4); safety=mat('Safety Yellow',(0.85,0.68,0.08),rough=.55); darkglass=mat('Blackout Glass',(0.015,0.025,0.03),metallic=.4,rough=.3); blood=mat('Dried Rust',(0.19,0.025,0.018),rough=.9)
 
 def box(name, loc, scale, material, bevel=.08):
     bpy.ops.mesh.primitive_cube_add(location=loc); o=bpy.context.object; o.name=name; o.dimensions=scale; bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
@@ -101,6 +101,25 @@ for x in (-4,0,4):
     box('NeonWayfinding',(x,2.8,13.3),(2.6,.12,.16),light,.02)
 box('DeliveryPallet',(24,.45,-13.8),(4.6,.7,2.6),wood,.08)
 for x in (22.8,24.2,25.6): box('Parcel', (x,1.1,-13.8),(1.0,.9,1.0),accent,.06)
+
+# Signature landmarks and disaster storytelling details.
+box('SupermarketRollerShutter',(12,2.1,6.32),(8.0,2.4,.12),roof,.02)
+for x in (8.8,10.2,11.6,13.0,14.4,15.8): box('ShutterSlat',(x,2.1,6.18),(.08,2.2,.04),frame,.01)
+box('PharmacyCross',(29,4.0,7.0),(.25,1.8,.12),light,.02); box('PharmacyCrossBar',(29,4.0,7.0),(1.8,.25,.12),light,.02)
+box('EmergencyBeacon',(39,7.0,7.9),(.35,.35,.35),warning,.12)
+for x in (31,47): box('VerticalShopBlade',(x,4.2,7.3),(.16,3.4,1.0),accent,.03)
+for x in (-28,-20,-14):
+    box('BalconyFlowerPot',(x,.95,14.0),(.7,.45,.55),concrete,.08); box('BalconyPlant',(x,1.35,14.0),(.45,.6,.45),green,.15)
+for x in (9,15,21): box('SolarPanel',(x,8.65,-3),(3.0,.08,1.4),darkglass,.02)
+for z in (-4,0,4): box('ServiceVent',(25,4.2,z),(1.8,1.4,.25),frame,.08)
+for x in (-9,-5,-1): box('CrosswalkStripe',(x,.03,16.0),(2.4,.04,.35),safety,.01)
+box('BusShelterRoof',(54,3.1,14.0),(6.5,.25,2.8),roof,.06)
+for x in (51.5,56.5): box('BusShelterPost',(x,1.6,14.0),(.16,3.2,.16),frame,.02)
+box('BusShelterGlass',(54,1.7,14.0),(6.0,2.5,.06),darkglass,.01)
+box('ToppledCart',(18,.6,12.0),(2.0,.55,.7),frame,.12); box('CartHandle',(18,1.25,12.5),(1.8,.12,.12),frame,.04)
+box('StrollerFrame',(-10,.8,11.7),(1.1,1.2,.8),frame,.14); box('StrollerHood',(-10,1.55,11.7),(1.2,.1,.9),accent,.12)
+box('DragMarkA',(-5,.06,7.5),(7.0,.025,.18),blood,.02); box('DragMarkB',(-2,.065,7.1),(3.5,.026,.12),blood,.02)
+box('BrokenSign',(45,2.5,7.2),(3.4,.12,.18),warning,.02)
 
 bpy.ops.wm.save_as_mainfile(filepath=os.path.splitext(OUT)[0]+'.blend')
 bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', use_selection=False, export_apply=True)
