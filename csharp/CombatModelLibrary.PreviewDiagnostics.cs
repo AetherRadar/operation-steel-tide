@@ -149,9 +149,8 @@ internal static partial class CombatModelLibrary
     }
 
     /// <summary>
-    /// Builds every operator preview and reports the upright roll applied to
-    /// each. Rolls beyond <see cref="PreviewUprightSanityMaximumRadians"/>
-    /// mean the asset needs pipeline attention instead of a bigger correction.
+    /// Builds every operator preview and verifies that no runtime pose
+    /// correction is applied. Any visual alignment issue belongs in Blender.
     /// </summary>
     internal static PreviewOperatorUprightInspection InspectPreviewOperatorUprightForDiagnostics()
     {
@@ -194,7 +193,6 @@ internal static partial class CombatModelLibrary
         bool AllBuilt)
     {
         public bool Valid => AllBuilt
-            && UprightRollRadiansByVisual.Values.All(
-                roll => !float.IsNaN(roll) && Mathf.Abs(roll) <= PreviewUprightSanityMaximumRadians);
+            && UprightRollRadiansByVisual.Values.All(roll => !float.IsNaN(roll) && Mathf.Abs(roll) <= 0.0001f);
     }
 }

@@ -6,6 +6,7 @@ namespace OperationSteelTide;
 internal static partial class CombatModelLibrary
 {
     private const string Hy3dOperatorRoot = "res://assets/models/hy3d_operators";
+    private const string EnemyOperatorRoot = "res://assets/models/enemy_operator";
 
     private readonly record struct OperatorVisualAssetSpec(
         string RuntimeScenePath,
@@ -28,11 +29,11 @@ internal static partial class CombatModelLibrary
         if (visualId == OperatorVisualId.Garrison)
         {
             return new OperatorVisualAssetSpec(
-                OperatorScenePath,
-                PreviewOperatorScenePath,
-                OperatorNodes,
-                PreviewOperatorNodes,
-                UsesQuaterniusRig: false);
+                $"{EnemyOperatorRoot}/enemy_operator.glb",
+                $"{EnemyOperatorRoot}/enemy_operator.glb",
+                Hy3dOperatorNodes,
+                Hy3dOperatorNodes,
+                UsesQuaterniusRig: true);
         }
 
         var slug = visualId switch
@@ -57,40 +58,7 @@ internal static partial class CombatModelLibrary
 
     internal static bool UsesHy3dOperator(OperatorVisualId visualId)
     {
-        if (visualId == OperatorVisualId.Garrison)
-        {
-            return false;
-        }
-
-        var slug = visualId switch
-        {
-            OperatorVisualId.Heron => "heron",
-            OperatorVisualId.Lynx => "lynx",
-            OperatorVisualId.Magpie => "magpie",
-            OperatorVisualId.Jackal => "jackal",
-            _ => "viper"
-        };
         return true;
     }
 
-    /// <summary>
-    /// Remove Blender's default primitive exports from the HY-3D operator files.
-    /// They are not part of the authored character and render as bright white
-    /// cubes at the operator's feet when left in the runtime scene.
-    /// </summary>
-    private static void RemoveOperatorExportPlaceholders(Node root)
-    {
-        foreach (var child in root.GetChildren())
-        {
-            var isDefaultCube = child is MeshInstance3D
-                && child.Name.ToString().Contains("Cube", StringComparison.OrdinalIgnoreCase);
-            if (isDefaultCube)
-            {
-                root.RemoveChild(child);
-                child.Free();
-                continue;
-            }
-            RemoveOperatorExportPlaceholders(child);
-        }
-    }
 }

@@ -2492,10 +2492,6 @@ internal static partial class CombatModelLibrary
         var source = InstantiateRequired(
             asset.RuntimeScenePath,
             asset.RuntimeNodes);
-        if (asset.UsesQuaterniusRig && UsesHy3dOperator(visualId))
-        {
-            RemoveOperatorExportPlaceholders(source);
-        }
         var sourceBounds = asset.UsesQuaterniusRig ? ComputeBounds(source) : default;
         if (asset.UsesQuaterniusRig && (sourceBounds.MeshCount == 0 || sourceBounds.Size.Y <= 0.01f))
         {
@@ -2953,84 +2949,6 @@ internal static partial class CombatModelLibrary
         return null;
     }
 
-    /// <summary>
-    /// Hips sideways offset (metres, actor space) tolerated in a deployment
-    /// product shot. The HY-3D retarget bakes a systematic lateral bias into
-    /// some characters (Viper ≈ 0.15 m) while unaffected ones sit an order of
-    /// magnitude below this gate, so the margin survives pipeline rebuilds.
-    /// </summary>
-    private const float PreviewUprightHipsGateMetres = 0.08f;
-
-    /// <summary>Rolls below this angle are left alone to preserve authored stance.</summary>
-    private const float PreviewUprightMinimumRollRadians = 0.035f;
-
-    /// <summary>
-    /// Sanity bound for the upright correction. Anything larger means the
-    /// asset regressed in the pipeline and needs attention there instead.
-    /// </summary>
-    internal const float PreviewUprightSanityMaximumRadians = 0.30f;
-
-    /// <summary>
-    /// Rolls a leaning preview source upright around its feet. Measures the
-    /// feet-to-head line from skeleton rest poses (stable across retarget
-    /// rebuilds) and rotates about Z so the line stands vertical while the
-    /// stance stays planted; the caller recenters bounds afterwards. Returns
-    /// the applied roll, or 0 when the asset is already straight, has no
-    /// usable legs rig, or anything goes wrong (a leaning card is preferable
-    /// to a missing one).
-    /// </summary>
-    internal static float ApplyPreviewUprightCorrection(Node3D source)
-    {
-        try
-        {
-            var skeleton = RequireSkeleton(source);
-            var hipsName = ResolveBoneName(skeleton, "Hips");
-            var headName = ResolveBoneName(skeleton, "mixamorig:Head");
-            var leftFootName = ResolveBoneName(skeleton, "mixamorig:LeftFoot");
-            var rightFootName = ResolveBoneName(skeleton, "mixamorig:RightFoot");
-            if (hipsName is null || headName is null || leftFootName is null || rightFootName is null)
-            {
-                return 0.0f;
-            }
-            var skeletonToSource = ReferenceEquals(skeleton, source)
-                ? Transform3D.Identity
-                : TransformRelativeToAncestor(skeleton, source);
-            Vector3 RestOriginInSource(StringName boneName)
-                => (skeletonToSource * skeleton.GetBoneGlobalRest(skeleton.FindBone(boneName))).Origin;
-            var hips = RestOriginInSource(hipsName);
-            if (Mathf.Abs(hips.X) < PreviewUprightHipsGateMetres)
-            {
-                return 0.0f;
-            }
-            var head = RestOriginInSource(headName);
-            var feetMid = (RestOriginInSource(leftFootName) + RestOriginInSource(rightFootName)) * 0.5f;
-            var span = head - feetMid;
-            if (span.Y <= 0.2f)
-            {
-                return 0.0f;
-            }
-            var roll = Mathf.Atan2(span.X, span.Y);
-            if (Mathf.Abs(roll) < PreviewUprightMinimumRollRadians)
-            {
-                return 0.0f;
-            }
-            // Rotate about the feet (not the origin) so the stance stays
-            // planted: T = pivot - R * pivot. The bounds recenter below
-            // absorbs the translation; only the pivot choice survives it.
-            var rollBasis = new Basis(new Quaternion(new Vector3(0.0f, 0.0f, 1.0f), roll));
-            var transform = source.Transform;
-            transform.Basis = rollBasis * transform.Basis;
-            transform.Origin += feetMid - rollBasis * feetMid;
-            source.Transform = transform;
-            return roll;
-        }
-        catch
-        {
-            // Cosmetic-only path: never fail a preview build over straightening.
-            return 0.0f;
-        }
-    }
-
     public static AuthoredPreviewOperatorVisual InstantiatePreviewOperator()
         => InstantiatePreviewOperator(OperatorVisualId.Garrison);
 
@@ -3064,19 +2982,10 @@ internal static partial class CombatModelLibrary
             source = InstantiateRequired(
                 asset.PreviewScenePath,
                 asset.PreviewNodes);
-            if (asset.UsesQuaterniusRig && UsesHy3dOperator(visualId))
-            {
-                RemoveOperatorExportPlaceholders(source);
-            }
             buildObserver?.Invoke(PreviewOperatorBuildStage.SourceCreated, source, null);
-            // Some HY-3D conversions bake a systematic sideways bias into the
-            // rest pose (Viper's hips sit ~0.15 m off-axis). The deployment
-            // card freezes that rest pose, so the operator reads as leaning.
-            // Roll the source upright before measuring bounds; gameplay clips
-            // override the pose every frame and are unaffected.
-            var uprightRollRadians = asset.UsesQuaterniusRig
-                ? ApplyPreviewUprightCorrection(source)
-                : 0.0f;
+            // The preview uses the authored rest pose. Any alignment change
+            // belongs in the Blender source asset.
+            const float uprightRollRadians = 0.0f;
             var sourceBounds = asset.UsesQuaterniusRig
                 ? ComputeBounds(source)
                 : (MeshCount: 1, Size: PreviewOperatorSourceSize, Center: PreviewOperatorSourceCenter);

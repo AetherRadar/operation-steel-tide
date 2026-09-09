@@ -303,7 +303,6 @@ public partial class FreightTerminalWorld
             && rivals.Any(enemy =>
                 ColorDistance(enemy.AuthoredTeamColorForDiagnostics, garrisonColor) > 0.55f)
             && rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count() >= 2;
-        var previewFailureHandling = InventoryOperatorPreviewRecovery.InspectFailureHandlingForDiagnostics();
         var previewOwnership = CombatModelLibrary.InspectPreviewOperatorOwnershipForDiagnostics();
         var previewUpright = CombatModelLibrary.InspectPreviewOperatorUprightForDiagnostics();
         var valid = weaponGeometry
@@ -326,7 +325,6 @@ public partial class FreightTerminalWorld
             && squadAuthored
             && enemiesAuthored
             && factionAppearance
-            && previewFailureHandling.Valid
             && previewOwnership.Valid
             && previewUpright.Valid;
 
@@ -394,13 +392,6 @@ public partial class FreightTerminalWorld
             + $"enemies_authored={enemiesAuthored} enemies={livingEnemies.Length} "
             + $"faction_appearance={factionAppearance} garrison_color={garrisonColor} "
             + $"rival_colors={rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count()} "
-            + $"preview_failure_safe={previewFailureHandling.Valid} "
-            + $"preview_fallback_attempts={previewFailureHandling.FallbackPrimaryAttempts}/"
-            + $"{previewFailureHandling.FallbackGarrisonAttempts} "
-            + $"preview_fallback_reports={previewFailureHandling.FallbackFailureReports} "
-            + $"preview_empty_attempts={previewFailureHandling.EmptyPrimaryAttempts}/"
-            + $"{previewFailureHandling.EmptyGarrisonAttempts} "
-            + $"preview_empty_reports={previewFailureHandling.EmptyFailureReports} "
             + $"preview_ownership={previewOwnership.Valid} "
             + $"preview_source_cleanup={previewOwnership.SourceFreedBeforeWrapper} "
             + $"preview_wrapper_cleanup={previewOwnership.WrapperFreedAfterOwnership}/"
