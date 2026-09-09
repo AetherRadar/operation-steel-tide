@@ -108,11 +108,22 @@ public partial class FreightTerminalWorld
         body.CollisionLayer = 1;
         body.CollisionMask = 1 | 2;
         root.AddChild(body);
-        AddCollision(body, new Vector3(-22, 7.0f, 2), new Vector3(15, 14, 20));
-        AddCollision(body, new Vector3(12, 4.0f, -3), new Vector3(26, 8, 18));
-        AddCollision(body, new Vector3(29, 2.7f, 1), new Vector3(8, 5.4f, 12));
-        AddCollision(body, new Vector3(39, 2.7f, 1), new Vector3(8, 5.4f, 12));
-        AddCollision(body, new Vector3(49, 2.7f, 1), new Vector3(8, 5.4f, 12));
+        AddPerimeterWithOpening(body, new Vector3(-22, 7.0f, 2), new Vector3(15, 14, 20), 7.0f);
+        AddPerimeterWithOpening(body, new Vector3(12, 4.0f, -3), new Vector3(26, 8, 18), 7.0f);
+        AddPerimeterWithOpening(body, new Vector3(29, 2.7f, 1), new Vector3(8, 5.4f, 12), 3.0f);
+        AddPerimeterWithOpening(body, new Vector3(39, 2.7f, 1), new Vector3(8, 5.4f, 12), 3.0f);
+        AddPerimeterWithOpening(body, new Vector3(49, 2.7f, 1), new Vector3(8, 5.4f, 12), 3.0f);
+    }
+
+    private static void AddPerimeterWithOpening(StaticBody3D body, Vector3 center, Vector3 size, float openingWidth)
+    {
+        const float wall = 0.35f;
+        var sideWidth = Mathf.Max(0.4f, (size.X - openingWidth) * 0.5f);
+        AddCollision(body, center + new Vector3(-(openingWidth + sideWidth) * 0.5f, 0, size.Z * 0.5f), new Vector3(sideWidth, size.Y, wall));
+        AddCollision(body, center + new Vector3((openingWidth + sideWidth) * 0.5f, 0, size.Z * 0.5f), new Vector3(sideWidth, size.Y, wall));
+        AddCollision(body, center + new Vector3(0, 0, -size.Z * 0.5f), new Vector3(size.X, size.Y, wall));
+        AddCollision(body, center + new Vector3(-size.X * 0.5f, 0, 0), new Vector3(wall, size.Y, size.Z));
+        AddCollision(body, center + new Vector3(size.X * 0.5f, 0, 0), new Vector3(wall, size.Y, size.Z));
     }
 
     private static void AddCollision(StaticBody3D body, Vector3 position, Vector3 size)

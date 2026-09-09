@@ -17,13 +17,19 @@ def mat(name, color, metallic=0.0, rough=0.7, emission=None):
         bs.inputs['Emission Color'].default_value=(*emission,1); bs.inputs['Emission Strength'].default_value=2.0
     return m
 
-concrete=mat('Concrete',(0.34,0.38,0.4),rough=.9); brick=mat('Warm Brick',(0.46,0.22,0.16),rough=.85); glass=mat('Blue Glass',(0.08,0.24,0.3),metallic=.35,rough=.18); frame=mat('Window Frames',(0.05,0.07,0.08),metallic=.7,rough=.25); roof=mat('Roof Metal',(0.12,0.15,0.16),metallic=.75,rough=.35); asphalt=mat('Plaza Asphalt',(0.08,0.1,0.11),rough=.95); tile=mat('Plaza Tile',(0.32,0.38,0.35),rough=.8); accent=mat('Shop Accent',(0.8,0.42,0.12),rough=.5); green=mat('Planter Green',(0.12,0.3,0.18),rough=.9); light=mat('Interior Light',(1.0,0.55,0.2),emission=(1.0,.28,.08),rough=.35)
+concrete=mat('Concrete',(0.34,0.38,0.4),rough=.9); brick=mat('Warm Brick',(0.46,0.22,0.16),rough=.85); glass=mat('Blue Glass',(0.08,0.24,0.3),metallic=.35,rough=.18); frame=mat('Window Frames',(0.05,0.07,0.08),metallic=.7,rough=.25); roof=mat('Roof Metal',(0.12,0.15,0.16),metallic=.75,rough=.35); asphalt=mat('Plaza Asphalt',(0.08,0.1,0.11),rough=.95); tile=mat('Plaza Tile',(0.32,0.38,0.35),rough=.8); accent=mat('Shop Accent',(0.8,0.42,0.12),rough=.5); green=mat('Planter Green',(0.12,0.3,0.18),rough=.9); wood=mat('Bench Wood',(0.28,0.14,0.07),rough=.8); light=mat('Interior Light',(1.0,0.55,0.2),emission=(1.0,.28,.08),rough=.35)
 
 def box(name, loc, scale, material, bevel=.08):
     bpy.ops.mesh.primitive_cube_add(location=loc); o=bpy.context.object; o.name=name; o.dimensions=scale; bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     o.data.materials.append(material)
     if bevel:
         mod=o.modifiers.new('EdgeSoftening','BEVEL'); mod.width=bevel; mod.segments=2
+    return o
+
+def cyl(name, loc, radius, depth, material, vertices=24):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=loc)
+    o=bpy.context.object; o.name=name; o.data.materials.append(material)
+    mod=o.modifiers.new('EdgeSoftening','BEVEL'); mod.width=.04; mod.segments=2
     return o
 
 def sign(name, text, loc, size, material):
@@ -70,6 +76,31 @@ for x in (29,39,49): box('ArcadeColumn',(x,3.0,8.0),(.28,6.0,.28),frame,.02)
 for x in (-10,0,10): box('Bench',(x,.65,14),(3.0,.65,.65),concrete,.12)
 for x in (-31,-5,21,55):
     box('LampPost',(x,2.0,17),(.18,4.0,.18),frame,.03); box('LampGlow',(x,4.15,17),(.45,.2,.45),light,.08)
+
+# Distinctive lived-in details: roof utilities, emergency lighting and delivery clutter.
+for x in (-27,-22,-17):
+    box('ACOutdoorUnit',(x,5.1,-8.7),(1.0,.8,.55),frame,.08)
+    box('CurtainGlow',(x,2.9,-8.32),(1.7,1.25,.08),light,.01)
+for x in (-28,-20,-14):
+    box('BalconyLaundry',(x,8.7,13.25),(2.1,.05,.9),accent,.02)
+for x in (-27,-17):
+    cyl('RoofWaterTank',(x,16.0,2),1.25,2.6,roof); box('TankBand',(x,16.0,2),(2.6,.12,2.6),accent,.02)
+for x in (6,12,18):
+    box('AisleEmergencyStrip',(x,7.95,-3),(3.0,.08,.18),light,.02)
+for x in (6,10,14,18):
+    box('ShoppingCartBay',(x,1.05,6.9),(2.3,1.0,.8),frame,.08)
+for x in (7,17,27):
+    box('StoreAwning',(x,5.1,7.55),(6.4,.16,2.1),accent,.04)
+box('CommunityNoticeBoard',(-2,2.1,15.4),(5.8,3.2,.18),frame,.04)
+box('NoticeBoardPaperA',(-3.2,2.2,15.25),(1.4,1.7,.04),light,.01)
+box('NoticeBoardPaperB',(-1.0,1.7,15.24),(1.6,.9,.04),accent,.01)
+box('DryFountain',(0,.35,2),(5.5,.25,5.5),concrete,.18)
+for x,z in ((-1.6,-1.6),(1.6,-1.6),(-1.6,1.6),(1.6,1.6)):
+    cyl('FountainNozzle',(x,.62,z),.18,.65,frame)
+for x in (-4,0,4):
+    box('NeonWayfinding',(x,2.8,13.3),(2.6,.12,.16),light,.02)
+box('DeliveryPallet',(24,.45,-13.8),(4.6,.7,2.6),wood,.08)
+for x in (22.8,24.2,25.6): box('Parcel', (x,1.1,-13.8),(1.0,.9,1.0),accent,.06)
 
 bpy.ops.wm.save_as_mainfile(filepath=os.path.splitext(OUT)[0]+'.blend')
 bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', use_selection=False, export_apply=True)
