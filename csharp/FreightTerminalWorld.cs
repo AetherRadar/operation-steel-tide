@@ -194,6 +194,12 @@ public partial class FreightTerminalWorld : Node3D
         // Startup time-of-day from command line (e.g. --time=Night) must be visible immediately in the lobby,
         // not only after OnMissionLoaded. Otherwise START_GAME.bat always looks like Day until deployment.
         var startupTimeOfDay = TimeOfDayStyles.ResolveStartupTimeOfDay(args);
+        if (IsSurvivalMode
+            && startupTimeOfDay == DeploymentTimeOfDay.Day
+            && !Array.Exists(args, argument => argument.StartsWith("--time=", StringComparison.OrdinalIgnoreCase)))
+        {
+            startupTimeOfDay = DeploymentTimeOfDay.Night;
+        }
         if (startupTimeOfDay != DeploymentTimeOfDay.Day)
         {
             _deploymentTimeOfDay = startupTimeOfDay;
