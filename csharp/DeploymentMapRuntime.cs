@@ -63,6 +63,14 @@ public static class DeploymentMapRuntime
             SelectMap(DeploymentMapCatalog.OrbitalComplexId);
         }
 
+        if (Array.Exists(args, value =>
+                value is "--validate-residential-survival"
+                    or "--validate-residential-survival-map"
+                    or "--capture-residential-survival"))
+        {
+            SelectMap(DeploymentMapCatalog.ResidentialSurvivalId);
+        }
+
         return _selectedMapId;
     }
 

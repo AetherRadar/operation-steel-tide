@@ -303,7 +303,7 @@ public partial class FreightTerminalWorld
             < DeploymentCatalog.AmmoPrice(LootGrade.Epic, AmmoCaliber.Rifle, 90)
             && DeploymentCatalog.AmmoPrice(LootGrade.Epic, AmmoCaliber.Rifle, 90)
             < DeploymentCatalog.AmmoPrice(LootGrade.Legendary, AmmoCaliber.Rifle, 90);
-        var mapCatalog = _hud.DeploymentMapCount == 3
+        var mapCatalog = _hud.DeploymentMapCount == DeploymentMapCatalog.Maps.Count
             && _hud.SelectedDeploymentMapId == DeploymentMapCatalog.FreightTerminalId
             && _hud.DeploymentMapAvailable;
         var rankRestrictionsDisabled = !DeploymentAccessPolicy.ReputationRestrictionsEnabled;

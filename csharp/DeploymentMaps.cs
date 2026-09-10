@@ -18,6 +18,7 @@ public static class DeploymentMapCatalog
     public const string FreightTerminalId = "freight_terminal";
     public const string BlackwaterRefineryId = "blackwater_refinery";
     public const string OrbitalComplexId = "orbital_complex";
+    public const string ResidentialSurvivalId = "residential_survival";
 
     public static readonly IReadOnlyList<DeploymentMapOffer> Maps = new[]
     {
@@ -44,6 +45,14 @@ public static class DeploymentMapCatalog
             "FALLTIDE RECOVERY ARRAY",
             "map_orbital_complex_subtitle",
             "STORM-BARRIER QUARANTINE COMPLEX",
+            true),
+        new DeploymentMapOffer(
+            ResidentialSurvivalId,
+            "MAP 04",
+            "map_residential_survival",
+            "LASTLIGHT COMMUNITY",
+            "map_residential_survival_subtitle",
+            "RESIDENTIAL SURVIVAL ZONE  //  NORTHSTAR PLAZA",
             true)
     };
 

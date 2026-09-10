@@ -125,13 +125,21 @@ public partial class CombatHUD
         _deploymentMapCaption = DeploymentCaption("DEPLOYMENT MAP", new Vector2(340, 7), new Vector2(290, 18));
         panel.AddChild(_deploymentMapCaption);
         var mapGroup = new ButtonGroup();
+        // Keep the data-driven map strip inside the 340..630 header lane as maps are added.
+        const float mapStripWidth = 292.0f;
+        const float mapStripGap = 4.0f;
+        var mapButtonWidth = (mapStripWidth - mapStripGap * (DeploymentMapCatalog.Maps.Count - 1))
+            / DeploymentMapCatalog.Maps.Count;
         for (var index = 0; index < DeploymentMapCatalog.Maps.Count; index++)
         {
             var map = DeploymentMapCatalog.Maps[index];
             var accent = map.Available
                 ? new Color(0.32f, 0.86f, 0.69f)
                 : new Color(0.3f, 0.38f, 0.37f);
-            var button = DeploymentSegment(new Vector2(340 + index * 99, 27), new Vector2(94, 37), accent);
+            var button = DeploymentSegment(
+                new Vector2(340 + index * (mapButtonWidth + mapStripGap), 27),
+                new Vector2(mapButtonWidth, 37),
+                accent);
             button.ToggleMode = true;
             button.ButtonGroup = mapGroup;
             button.Disabled = !map.Available;

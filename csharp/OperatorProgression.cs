@@ -143,9 +143,13 @@ public static class OperatorReputation
             return 3;
         }
 
-        return string.Equals(mapId, DeploymentMapCatalog.BlackwaterRefineryId, StringComparison.OrdinalIgnoreCase)
-            ? 2
-            : 1;
+        if (string.Equals(mapId, DeploymentMapCatalog.BlackwaterRefineryId, StringComparison.OrdinalIgnoreCase))
+        {
+            return 2;
+        }
+
+        // The residential survival scenario is the onboarding map.
+        return 1;
     }
 
     public static int RequiredLevelForPreset(DeploymentPresetOffer preset)
