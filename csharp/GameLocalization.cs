@@ -448,6 +448,11 @@ public static class GameLocalization
         Chinese["map_orbital_complex_subtitle"] = "\u98ce\u66b4\u575d\u68c0\u75ab\u533a";
         Chinese["map_residential_survival"] = "\u4f59\u6656\u751f\u6d3b\u7fa4";
         Chinese["map_residential_survival_subtitle"] = "\u5c45\u6c11\u697c\u751f\u5b58\u533a  //  \u5317\u8fb0\u5e7f\u573a";
+        Chinese["survival_wave"] = "\u611f\u67d3\u6f6e {0}\u5df2\u62b5\u8fbe";
+        Chinese["survival_breach"] = "\u611f\u67d3\u8005\u7a81\u7834\u9632\u7ebf";
+        Chinese["survival_next"] = "\u4e0b\u6ce2 {0}s";
+        Chinese["survival_active"] = "\u573a\u4e0a {0}";
+        Chinese["survival_cleared"] = "\u6e05\u9664 {0}";
         Chinese["falltide_objective_breakers"] = "\u7a33\u5b9a\u98ce\u66b4\u7535\u7f51\u65ad\u8def\u5668";
         Chinese["falltide_objective_quarantine"] = "\u6388\u6743\u89e3\u9664\u68c0\u75ab\u5c01\u9501";
         Chinese["stabilize_breakers"] = "\u7a33\u5b9a\u65ad\u8def\u5668";

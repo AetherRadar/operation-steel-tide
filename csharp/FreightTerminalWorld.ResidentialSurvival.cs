@@ -121,19 +121,28 @@ public partial class FreightTerminalWorld
         var index = 0;
         foreach (var position in ResidentialSurvivalSupplySpots)
         {
-            var item = new LootItem
-            {
-                Kind = LootItemKind.Medical,
-                MedicalKind = index % 3 == 0 ? MedicalItemKind.FieldMedkit : MedicalItemKind.Bandage,
-                Quantity = index % 3 == 0 ? 1 : 2,
-                Grade = LootGrade.Common
-            };
+            var food = index % 3 == 1;
+            var item = food
+                ? new LootItem
+                {
+                    Kind = LootItemKind.Valuable,
+                    ValuableKind = ValuableItemKind.CannedCoffee,
+                    Quantity = 2,
+                    Grade = LootGrade.Common
+                }
+                : new LootItem
+                {
+                    Kind = LootItemKind.Medical,
+                    MedicalKind = index % 3 == 0 ? MedicalItemKind.FieldMedkit : MedicalItemKind.Bandage,
+                    Quantity = index % 3 == 0 ? 1 : 2,
+                    Grade = LootGrade.Common
+                };
             var pickup = new GradedLootPickup
             {
                 Name = $"SurvivalSupply_{++index:00}",
                 Position = position
             };
-            pickup.Configure(item, "Survival medical supply", "生存医疗物资");
+            pickup.Configure(item, food ? "Canned food supply" : "Survival medical supply", food ? "\u7f50\u88c5\u98df\u54c1\u7269\u8d44" : "\u751f\u5b58\u533b\u7597\u7269\u8d44");
             AddChild(pickup);
             _lootSources.Add(pickup);
             _lootWorldPoints.Add(position);

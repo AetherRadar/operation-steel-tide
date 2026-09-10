@@ -2061,6 +2061,14 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
                 killed = civilian.TakeDamage(stats.Damage * falloff * _rng.RandfRange(0.9f, 1.05f), end, this);
                 EmitSignal(SignalName.HitConfirmed, killed, false, false);
             }
+            else if (target is ZombieNpc zombie)
+            {
+                damagedTarget = true;
+                var distance = from.DistanceTo(end);
+                var falloff = Mathf.Lerp(1.0f, 0.58f, Mathf.Clamp(distance / maximumRange, 0.0f, 1.0f));
+                killed = zombie.TakeDamage(stats.Damage * falloff * _rng.RandfRange(0.92f, 1.08f), end, this);
+                EmitSignal(SignalName.HitConfirmed, killed, false, false);
+            }
             else if (target is ExplosiveBarrel barrel)
             {
                 damagedTarget = true;

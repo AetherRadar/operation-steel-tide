@@ -35,6 +35,11 @@ public static class DeploymentMapRuntime
             }
         }
 
+        if (Array.Exists(args, value => value.Equals("--mode=survival", StringComparison.OrdinalIgnoreCase)))
+        {
+            SelectMap(DeploymentMapCatalog.ResidentialSurvivalId);
+        }
+
         if (Array.Exists(args, value =>
                 value is "--validate-refinery-map"
                     or "--validate-refinery-collision"

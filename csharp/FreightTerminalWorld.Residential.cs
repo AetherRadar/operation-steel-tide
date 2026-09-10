@@ -1740,7 +1740,9 @@ public partial class FreightTerminalWorld
             + ResidentialTowerSpecs.Length
             + 2
             + ResidentialCivilianCount
-            + ResidentialRelayStationCount * 2;
+            + ResidentialRelayStationCount * 2
+            // Life-cluster landmark labels (supermarket, plaza, market hall).
+            + 3;
         var chinese = labels.All(label =>
             label.Text.Any(character => character >= '\u3400' && character <= '\u9fff'));
         var englishLeak = labels.FirstOrDefault(label => ResidentialEnglishLabelTokens.Any(token =>

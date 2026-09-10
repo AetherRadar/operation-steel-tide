@@ -163,6 +163,7 @@ public partial class FreightTerminalWorld
             ("--validate-stairs", static world => world.ValidateStairsClimb()),
             ("--validate-roof-access", static world => world.ValidateRoofAccess()),
             ("--validate-residential", static world => world.ValidateResidentialCommunity()),
+            ("--validate-residential-survival", static world => world.ValidateResidentialSurvival()),
             ("--validate-residential-gameplay", static world => world.ValidateResidentialGameplay()),
             ("--validate-residential-localization", static world => world.ValidateResidentialLocalization()),
             ("--validate-residential-cover", static world => world.ValidateResidentialCover()),
