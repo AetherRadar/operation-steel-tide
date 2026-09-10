@@ -559,6 +559,11 @@ void sky() {
     {
         ResetSquadTraversalLinks();
         _refineryDoors.Clear();
+        if (IsSurvivalMode)
+        {
+            BuildResidentialSurvivalLevel();
+            return;
+        }
         if (TryBuildOrbitalComplexRuntimeLevel())
         {
             return;

@@ -20,6 +20,8 @@ public partial class FreightTerminalWorld : Node3D
     private Vector3 ExtractionPoint
         => IsOrbitalComplexRuntimeMapSelected
             ? OrbitalComplexRuntimeExtractionPoint
+            : IsSurvivalMode
+            ? ResidentialSurvivalExtractionPoint
             : FreightTerminalExtractionPoint;
 
     private TacticalPlayer _player = null!;
@@ -185,6 +187,10 @@ public partial class FreightTerminalWorld : Node3D
         BuildEnvironment();
         BuildLevel();
         BuildHudAndPlayer();
+        if (IsSurvivalMode)
+        {
+            InitializeSurvivalZombies();
+        }
         // Startup time-of-day from command line (e.g. --time=Night) must be visible immediately in the lobby,
         // not only after OnMissionLoaded. Otherwise START_GAME.bat always looks like Day until deployment.
         var startupTimeOfDay = TimeOfDayStyles.ResolveStartupTimeOfDay(args);
@@ -198,12 +204,18 @@ public partial class FreightTerminalWorld : Node3D
         BuildSquadSystem();
         SpawnLootCases();
         SpawnBuildingGradedLoot();
-        SpawnCivilianValuableLoot();
-        SpawnIndustrialInteriorContent();
+        if (!IsSurvivalMode)
+        {
+            SpawnCivilianValuableLoot();
+            SpawnIndustrialInteriorContent();
+        }
         SpawnEnemies();
         SpawnHostileOperatorSquads();
-        SpawnWorldBoss();
-        SpawnExplosives();
+        if (!IsSurvivalMode)
+        {
+            SpawnWorldBoss();
+            SpawnExplosives();
+        }
         _hud.SetEnemyCount(_enemiesRemaining);
         _hud.SetMissionPhase(_missionPhase, _missionDirector.SpawnProtectionSeconds, _missionOnline);
         ApplyQuality(_qualitySetting);
@@ -281,6 +293,10 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
         UpdateSquad((float)delta);
+        if (IsSurvivalMode)
+        {
+            UpdateSurvivalZombies((float)delta);
+        }
         UpdateExtractionSequence((float)delta);
         UpdateDemolitionRound((float)delta);
         UpdateDemolitionNetwork((float)delta);
@@ -356,6 +372,10 @@ public partial class FreightTerminalWorld : Node3D
     private void InitMissionDirector()
     {
         _missionDirector = new MissionDirector { Name = "MissionDirector" };
+        if (IsSurvivalMode)
+        {
+            ConfigureResidentialSurvivalMission();
+        }
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             ConfigureOrbitalComplexRuntimeMission();
@@ -875,7 +895,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void BuildHudAndPlayer()
     {
-        if (IsOrbitalComplexRuntimeMapSelected)
+        if (IsSurvivalMode)
+        {
+            ConfigureResidentialSurvivalSpawnSelection();
+        }
+        else if (IsOrbitalComplexRuntimeMapSelected)
         {
             ConfigureOrbitalComplexRuntimeSpawnSelection();
         }
@@ -973,6 +997,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnLootCases()
     {
+        if (IsSurvivalMode)
+        {
+            SpawnResidentialSurvivalWeaponCases();
+            return;
+        }
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             SpawnOrbitalComplexRuntimeWeaponCases();
@@ -1162,6 +1191,11 @@ public partial class FreightTerminalWorld : Node3D
     private void SpawnBuildingGradedLoot()
     {
         _buildingLootPickupCount = 0;
+        if (IsSurvivalMode)
+        {
+            SpawnResidentialSurvivalSupplyLoot();
+            return;
+        }
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             SpawnOrbitalComplexRuntimeGradedLoot();
@@ -1356,6 +1390,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnEnemies()
     {
+        if (IsSurvivalMode)
+        {
+            _enemiesRemaining = _enemies.Count(e => IsInstanceValid(e) && !e.IsDead);
+            return;
+        }
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             SpawnOrbitalComplexRuntimeEnemies();
@@ -1416,6 +1455,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnHostileOperatorSquads()
     {
+        if (IsSurvivalMode)
+        {
+            _hostileSquads.Clear();
+            return;
+        }
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             SpawnOrbitalComplexRuntimeHostileSquads();
