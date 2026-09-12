@@ -225,7 +225,17 @@ public partial class FreightTerminalWorld : Node3D
             SpawnExplosives();
         }
         _hud.SetEnemyCount(_enemiesRemaining);
-        _hud.SetMissionPhase(_missionPhase, _missionDirector.SpawnProtectionSeconds, _missionOnline);
+        if (IsSurvivalMode)
+        {
+            _missionPhase = "SURVIVAL";
+            _missionRemaining = 0.0f;
+            _missionOnline = false;
+            _hud.SetSurvivalModePresentation();
+        }
+        else
+        {
+            _hud.SetMissionPhase(_missionPhase, _missionDirector.SpawnProtectionSeconds, _missionOnline);
+        }
         ApplyQuality(_qualitySetting);
         // Re-apply time after quality (quality rebuilds some sky state) so Night stays dark even on low quality.
         ApplyTimeOfDay(startupTimeOfDay);
@@ -305,22 +315,25 @@ public partial class FreightTerminalWorld : Node3D
         {
             UpdateSurvivalZombies((float)delta);
         }
-        UpdateExtractionSequence((float)delta);
-        UpdateDemolitionRound((float)delta);
-        UpdateDemolitionNetwork((float)delta);
-        UpdateExtractionNetwork((float)delta);
-        UpdateWorldBossTracking();
-        UpdateOrbitalComplexRuntimePresentation((float)delta);
-        if (IsInstanceValid(_extractionMarker))
+        else
         {
-            _extractionMarker.RotateY((float)delta * 0.35f);
-            var baseScale = _missionPhase == MissionPhaseNames.Extraction ? 1.12f : 0.94f;
-            if (IsExtractionCountdownActive)
+            UpdateExtractionSequence((float)delta);
+            UpdateDemolitionRound((float)delta);
+            UpdateDemolitionNetwork((float)delta);
+            UpdateExtractionNetwork((float)delta);
+            UpdateWorldBossTracking();
+            UpdateOrbitalComplexRuntimePresentation((float)delta);
+            if (IsInstanceValid(_extractionMarker))
             {
-                baseScale = 1.24f;
+                _extractionMarker.RotateY((float)delta * 0.35f);
+                var baseScale = _missionPhase == MissionPhaseNames.Extraction ? 1.12f : 0.94f;
+                if (IsExtractionCountdownActive)
+                {
+                    baseScale = 1.24f;
+                }
+                var pulse = baseScale + Mathf.Sin(Time.GetTicksMsec() * 0.003f) * 0.06f;
+                _extractionMarker.Scale = new Vector3(pulse, 1.0f, pulse);
             }
-            var pulse = baseScale + Mathf.Sin(Time.GetTicksMsec() * 0.003f) * 0.06f;
-            _extractionMarker.Scale = new Vector3(pulse, 1.0f, pulse);
         }
 
         if (UpdateRelayClimb((float)delta))
@@ -359,11 +372,14 @@ public partial class FreightTerminalWorld : Node3D
             }
         }
 
-        UpdateDeploymentProtection();
         UpdateInteraction((float)delta);
-        UpdateReinforcements((float)delta);
+        if (!IsSurvivalMode)
+        {
+            UpdateDeploymentProtection();
+            UpdateReinforcements((float)delta);
+        }
 
-        if (_enemies.Count > 0)
+        if (!IsSurvivalMode && _enemies.Count > 0)
         {
             var highestSuspicion = 0.0f;
             foreach (var enemy in _enemies)
@@ -415,6 +431,14 @@ public partial class FreightTerminalWorld : Node3D
             40,
             reinforcementThreshold + ThreatLevels.ReinforcementThresholdShift(_deploymentThreatLevel));
         _missionOnline = online;
+        if (IsSurvivalMode)
+        {
+            _missionPhase = "SURVIVAL";
+            _missionRemaining = 0.0f;
+            _missionOnline = false;
+            _hud.SetSurvivalModePresentation();
+            return;
+        }
         if (_demolitionMode)
         {
             return;
@@ -439,6 +463,14 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
+        if (IsSurvivalMode)
+        {
+            _missionPhase = "SURVIVAL";
+            _missionRemaining = 0.0f;
+            _missionOnline = false;
+            _hud.SetSurvivalModePresentation();
+            return;
+        }
         var enteredCombat = _missionPhase != MissionPhaseNames.Combat && phase == MissionPhaseNames.Combat;
         _missionPhase = phase;
         _missionRemaining = remaining;
@@ -455,6 +487,13 @@ public partial class FreightTerminalWorld : Node3D
     {
         if (_demolitionMode || IsExtractionNetworkClient)
         {
+            return;
+        }
+        if (IsSurvivalMode)
+        {
+            _missionPhase = "SURVIVAL";
+            _missionOnline = false;
+            _hud.SetSurvivalModePresentation();
             return;
         }
         _objectiveStage = index;
@@ -959,6 +998,7 @@ public partial class FreightTerminalWorld : Node3D
         _hud.OperationsQuickStartRequested += OnOperationsQuickStartRequested;
         _hud.DemolitionModeRequested += OnDemolitionModeRequested;
         _hud.TrainingRangeRequested += OnTrainingRangeRequested;
+        _hud.SurvivalModeRequested += OnSurvivalModeRequested;
         _hud.TrainingRangeDeployRequested += OnTrainingRangeDeployRequested;
         _hud.TrainingRangeSetupOpened += OnTrainingRangeSetupOpened;
         _hud.TrainingRangeSetupBackRequested += OnTrainingRangeSetupBackRequested;
@@ -2089,11 +2129,23 @@ public partial class FreightTerminalWorld : Node3D
         }
         if (ShouldFailLocalPlayerOnSecondDown())
         {
-            FailSquadMission();
+            if (IsSurvivalMode)
+            {
+                CompleteSurvivalDefeat();
+            }
+            else
+            {
+                FailSquadMission();
+            }
             return;
         }
         if (TryBeginLocalPlayerElimination())
         {
+            return;
+        }
+        if (IsSurvivalMode)
+        {
+            CompleteSurvivalDefeat();
             return;
         }
         if (_demolitionMode)

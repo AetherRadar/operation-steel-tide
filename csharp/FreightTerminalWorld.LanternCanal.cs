@@ -7,7 +7,7 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const string LanternCanalScenePath =
-        "res://assets/models/lantern_canal_world/lantern_canal_workshops_v2_5.glb";
+        "res://assets/models/lantern_canal_world/lantern_canal_world_v2_5.glb";
     private const string LanternCanalBackdropScenePath =
         "res://assets/models/jianghai_old_city/jianghai_old_city.glb";
     private static readonly Vector3 LanternCanalDeploymentPoint = new(-68.0f, 0.2f, 92.0f);
@@ -28,6 +28,7 @@ public partial class FreightTerminalWorld
     private int _lanternCanalCollisionCount;
     private int _lanternCanalLootCount;
     private int _lanternCanalObjectiveCount;
+    private int _lanternCanalMountainMeshCount;
 
     private bool IsLanternCanalMap
         => string.Equals(_activeRuntimeMapId, DeploymentMapCatalog.LanternCanalId, StringComparison.OrdinalIgnoreCase);
@@ -36,8 +37,9 @@ public partial class FreightTerminalWorld
     {
         _levelRoot = new Node3D { Name = "LanternCanalDistrict" };
         AddChild(_levelRoot);
-        _lanternCanalBackdrop = LoadLanternCanalScene(LanternCanalBackdropScenePath, "LanternCanalJianghaiBackdrop");
-        _lanternCanalScene = LoadLanternCanalScene(LanternCanalScenePath, "LanternCanalAuthoredWorkshops");
+        _lanternCanalBackdrop = LoadLanternCanalMountainBackdrop();
+        _lanternCanalScene = LoadLanternCanalScene(LanternCanalScenePath, "LanternCanalCompleteCity");
+        ConfigureLanternCanalCityPerformance(_lanternCanalScene);
         BuildLanternCanalCollision();
 
         BuildObjectiveTerminal("LanternCeramicsRelay", new Vector3(12.8f, 0.0f, 68.0f), -Mathf.Pi * 0.5f, true);
@@ -65,6 +67,62 @@ public partial class FreightTerminalWorld
         root.AddToGroup("lantern_canal_authored_scene");
         _levelRoot.AddChild(root);
         return root;
+    }
+
+    private Node3D LoadLanternCanalMountainBackdrop()
+    {
+        var root = LoadLanternCanalScene(LanternCanalBackdropScenePath, "LanternCanalMountainBackdrop");
+        _lanternCanalMountainMeshCount = 0;
+        ConfigureLanternCanalMountainOnly(root, false);
+        return root;
+    }
+
+    private void ConfigureLanternCanalMountainOnly(Node node, bool insideMountain)
+    {
+        var isMountain = insideMountain
+            || node.Name.ToString().StartsWith("JianghaiMountainMassif", StringComparison.Ordinal);
+        if (node is GeometryInstance3D geometry)
+        {
+            geometry.Visible = isMountain;
+            if (isMountain && geometry is MeshInstance3D)
+            {
+                _lanternCanalMountainMeshCount++;
+            }
+        }
+        if (node is Light3D light)
+        {
+            light.Visible = false;
+        }
+        foreach (var child in node.GetChildren())
+        {
+            if (child is Node childNode)
+            {
+                ConfigureLanternCanalMountainOnly(childNode, isMountain);
+            }
+        }
+    }
+
+    private static void ConfigureLanternCanalCityPerformance(Node3D city)
+    {
+        ConfigureLanternCanalCityNode(city, 0);
+    }
+
+    private static void ConfigureLanternCanalCityNode(Node node, int depth)
+    {
+        if (node is GeometryInstance3D geometry)
+        {
+            // Keep the authored 589 MB GLB intact while avoiding a shadow-map pass
+            // for every static surface. Visibility ranges let Godot cull deep blocks.
+            geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+            geometry.VisibilityRangeEnd = depth <= 2 ? 260.0f : 190.0f;
+        }
+        foreach (var child in node.GetChildren())
+        {
+            if (child is Node childNode)
+            {
+                ConfigureLanternCanalCityNode(childNode, depth + 1);
+            }
+        }
     }
 
     private void BuildLanternCanalCollision()
@@ -215,15 +273,21 @@ public partial class FreightTerminalWorld
             && FindLanternCanalNode(_lanternCanalScene, "10_House_E_05") is not null;
         var meshCount = CountLanternCanalMeshes(_lanternCanalScene);
         var lightCount = CountLanternCanalLights(_lanternCanalScene);
-        var backdropReady = IsInstanceValid(_lanternCanalBackdrop);
+        var visibleMountainCount = CountVisibleLanternCanalMeshes(_lanternCanalBackdrop);
+        using var completeCityFile = FileAccess.Open(LanternCanalScenePath, FileAccess.ModeFlags.Read);
+        var completeCityBytes = completeCityFile?.GetLength() ?? 0;
+        var completeCityReady = completeCityBytes >= 580_000_000;
+        var backdropReady = IsInstanceValid(_lanternCanalBackdrop)
+            && _lanternCanalMountainMeshCount >= 12
+            && visibleMountainCount == _lanternCanalMountainMeshCount;
         var collisionReady = _lanternCanalCollisionCount >= 30;
         var gameplayReady = _lanternCanalObjectiveCount == 2 && _lanternCanalLootCount >= 9;
         var spawnReady = DeploymentPoint == LanternCanalDeploymentPoint
             && ExtractionPoint == LanternCanalExtractionPoint
             && DeploymentPoint.DistanceTo(ExtractionPoint) > 140.0f;
-        var valid = workshopReady && backdropReady && meshCount >= 12 && lightCount >= 10
+        var valid = workshopReady && completeCityReady && backdropReady && meshCount >= 12 && lightCount >= 10
             && collisionReady && gameplayReady && spawnReady;
-        GD.Print($"LANTERN_CANAL_CHECK valid={valid} workshop={workshopReady} backdrop={backdropReady} meshes={meshCount} lights={lightCount} collision={_lanternCanalCollisionCount} objectives={_lanternCanalObjectiveCount} loot={_lanternCanalLootCount} spawn={spawnReady}");
+        GD.Print($"LANTERN_CANAL_CHECK valid={valid} workshop={workshopReady} complete_city={completeCityReady} bytes={completeCityBytes} backdrop_mountains={backdropReady} mountain_meshes={_lanternCanalMountainMeshCount} visible_mountains={visibleMountainCount} meshes={meshCount} lights={lightCount} collision={_lanternCanalCollisionCount} objectives={_lanternCanalObjectiveCount} loot={_lanternCanalLootCount} spawn={spawnReady}");
         GD.Print($"LANTERN_CANAL_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
@@ -275,6 +339,27 @@ public partial class FreightTerminalWorld
             if (child is Node node)
             {
                 count += CountLanternCanalMeshes(node);
+            }
+        }
+        return count;
+    }
+
+    private static int CountVisibleLanternCanalMeshes(Node? root)
+    {
+        if (root is null || !GodotObject.IsInstanceValid(root))
+        {
+            return 0;
+        }
+        var count = 0;
+        foreach (var child in root.GetChildren())
+        {
+            if (child is MeshInstance3D mesh && mesh.Visible && mesh.Mesh is not null)
+            {
+                count++;
+            }
+            if (child is Node node)
+            {
+                count += CountVisibleLanternCanalMeshes(node);
             }
         }
         return count;

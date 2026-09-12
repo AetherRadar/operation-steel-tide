@@ -11,6 +11,7 @@ namespace OperationSteelTide;
 /// </summary>
 public partial class FreightTerminalWorld
 {
+    internal const int ResidentialSurvivalWaveLimit = 8;
     private static readonly Vector3 ResidentialSurvivalExtractionPoint = new(-52.0f, 0.08f, 72.0f);
 
     private static readonly Vector3[] ResidentialSurvivalSpawnPads =
@@ -40,11 +41,11 @@ public partial class FreightTerminalWorld
 
     private void ConfigureResidentialSurvivalMission()
     {
-        _missionDirector.ConfigureMission(
+        _missionDirector.ConfigureLocalMission(
             "residential-survival",
-            new[] { "SECURE FOOD AND MEDICAL SUPPLIES", "RESTORE THE ROOFTOP EMERGENCY BEACON" },
-            new[] { "survival_supplies", "survival_beacon" },
-            new[] { "survival_objective_supplies", "survival_objective_beacon" });
+            new[] { "SURVIVE THE INCOMING WAVES", "CLEAR THE NORTHSTAR PLAZA" },
+            new[] { "survival_waves", "survival_clear" },
+            new[] { "survival_objective_waves", "survival_objective_clear" });
     }
 
     private void BuildResidentialSurvivalLevel()
@@ -66,7 +67,9 @@ public partial class FreightTerminalWorld
         var steel = Mat("survival_steel", new Color(0.08f, 0.1f, 0.1f), 0.5f, 0.75f);
         var yellow = Mat("survival_warning", new Color(0.8f, 0.52f, 0.08f), 0.3f, 0.6f);
         BuildExtraction(concrete, steel, yellow, concrete);
-        _extractionMarker.Visible = true;
+        // Survival is won by clearing the wave cap. Keep the area node for shared
+        // collision/diagnostic contracts, but never present an extraction target.
+        _extractionMarker.Visible = false;
     }
 
     private void ConfigureResidentialSurvivalSpawnSelection()

@@ -24,9 +24,13 @@ public partial class CombatHUD
     private Label _trainingRangeIndex = null!;
     private Label _trainingRangeTitle = null!;
     private Label _trainingRangeDetail = null!;
+    private Label _survivalIndex = null!;
+    private Label _survivalTitle = null!;
+    private Label _survivalDetail = null!;
     private Button _quickStartButton = null!;
     private Button _demolitionModeButton = null!;
     private Button _trainingRangeButton = null!;
+    private Button _survivalButton = null!;
     private Button _operationsQuitButton = null!;
     private Button _resultOfficeButton = null!;
     private OperationsOfficeFocus _operationsOfficeHoverFocus;
@@ -49,17 +53,20 @@ public partial class CombatHUD
         => IsInstanceValid(_quickStartButton)
         && IsInstanceValid(_demolitionModeButton)
         && IsInstanceValid(_trainingRangeButton)
+        && IsInstanceValid(_survivalButton)
         && IsInstanceValid(_operationsCredits)
         && IsInstanceValid(_resultOfficeButton)
         && _quickStartButton.FocusMode == Control.FocusModeEnum.All
         && _demolitionModeButton.FocusMode == Control.FocusModeEnum.All
-        && _trainingRangeButton.FocusMode == Control.FocusModeEnum.All;
+        && _trainingRangeButton.FocusMode == Control.FocusModeEnum.All
+        && _survivalButton.FocusMode == Control.FocusModeEnum.All;
     public bool OperationsOfficeUsesPackedScene
         => IsInstanceValid(_operationsOfficeRoot)
         && _operationsOfficeRoot.SceneFilePath == OperationsOfficeViewScenePath
         && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/QuickStartButton/QuickStartTitle") is not null
         && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/DemolitionModeButton/DemolitionEntryTitle") is not null
-        && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/TrainingRangeButton/TrainingRangeTitle") is not null;
+        && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/TrainingRangeButton/TrainingRangeTitle") is not null
+        && _operationsOfficeRoot.GetNodeOrNull<Control>("Rail/SurvivalButton/SurvivalTitle") is not null;
     public bool DemolitionBriefingUiReady
         => IsInstanceValid(_demolitionBriefingView) && _demolitionBriefingView.UiReady;
     public bool DemolitionBriefingUsesPackedScene
@@ -167,6 +174,11 @@ public partial class CombatHUD
         && _trainingRangeDetail.Text == Text(
             "operations_training_detail",
             "ALL GUNS  →  INFINITE AMMO  →  LIVE BOTS")
+        && _survivalIndex.Text == Text("operations_survival_index", "04  //  SURVIVAL")
+        && _survivalTitle.Text == Text("operations_survival_title", "SURVIVAL")
+        && _survivalDetail.Text == Text(
+            "operations_survival_detail",
+            "SCAVENGE  →  WAVES  →  CLEAR 8")
         && _operationsStatus.Text == Text(
             "operations_status_ready",
             "FIELD TEAM STANDING BY  //  HELIPAD CLEAR")
@@ -224,16 +236,22 @@ public partial class CombatHUD
         _trainingRangeIndex = _trainingRangeButton.GetNode<Label>("TrainingRangeIndex");
         _trainingRangeTitle = _trainingRangeButton.GetNode<Label>("TrainingRangeTitle");
         _trainingRangeDetail = _trainingRangeButton.GetNode<Label>("TrainingRangeDetail");
+        _survivalButton = rail.GetNode<Button>("SurvivalButton");
+        _survivalIndex = _survivalButton.GetNode<Label>("SurvivalIndex");
+        _survivalTitle = _survivalButton.GetNode<Label>("SurvivalTitle");
+        _survivalDetail = _survivalButton.GetNode<Label>("SurvivalDetail");
         _operationsStatus = rail.GetNode<Label>("OperationsStatus");
         _operationsQuitButton = rail.GetNode<Button>("OperationsQuitButton");
 
         _quickStartButton.Pressed += () => EmitSignal(SignalName.OperationsQuickStartRequested);
         _demolitionModeButton.Pressed += () => EmitSignal(SignalName.DemolitionModeRequested);
         _trainingRangeButton.Pressed += () => EmitSignal(SignalName.TrainingRangeRequested);
+        _survivalButton.Pressed += () => EmitSignal(SignalName.SurvivalModeRequested);
         _operationsQuitButton.Pressed += () => EmitSignal(SignalName.QuitRequested);
         BindOperationsFocus(_quickStartButton, OperationsOfficeFocus.QuickExtraction);
         BindOperationsFocus(_demolitionModeButton, OperationsOfficeFocus.Demolition);
         BindOperationsFocus(_trainingRangeButton, OperationsOfficeFocus.Neutral);
+        BindOperationsFocus(_survivalButton, OperationsOfficeFocus.Neutral);
     }
 
     private void BuildDemolitionBriefingView(Control root)
@@ -400,6 +418,9 @@ public partial class CombatHUD
     public void PressTrainingRangeForDiagnostics()
         => PressButtonForDiagnostics(_trainingRangeButton);
 
+    public void PressSurvivalModeForDiagnostics()
+        => PressButtonForDiagnostics(_survivalButton);
+
     public void FocusOperationsModeForDiagnostics(OperationsOfficeFocus focus)
     {
         switch (focus)
@@ -546,6 +567,9 @@ public partial class CombatHUD
         _trainingRangeIndex.Text = Text("operations_training_index", "03  //  TRAINING RANGE");
         _trainingRangeTitle.Text = Text("operations_training_title", "TRAINING RANGE");
         _trainingRangeDetail.Text = Text("operations_training_detail", "ALL GUNS  →  INFINITE AMMO  →  LIVE BOTS");
+        _survivalIndex.Text = Text("operations_survival_index", "04  //  SURVIVAL");
+        _survivalTitle.Text = Text("operations_survival_title", "SURVIVAL");
+        _survivalDetail.Text = Text("operations_survival_detail", "SCAVENGE  →  WAVES  →  CLEAR 8");
         _operationsQuitButton.Text = Text("operations_exit", "EXIT TO DESKTOP");
         _operationsStatus.Text = Text(
             "operations_status_ready",
@@ -556,6 +580,8 @@ public partial class CombatHUD
         _demolitionModeButton.TooltipText = _demolitionEntryTitle.Text;
         _trainingRangeButton.Text = _trainingRangeTitle.Text;
         _trainingRangeButton.TooltipText = _trainingRangeTitle.Text;
+        _survivalButton.Text = _survivalTitle.Text;
+        _survivalButton.TooltipText = _survivalTitle.Text;
         _demolitionBriefingView.SetLanguage(_language);
         _resultOfficeButton.Text = Text("operations_return", "RETURN TO OPERATIONS OFFICE");
         RefreshOperationsOfficeProfile();

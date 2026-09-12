@@ -277,6 +277,18 @@ public partial class FreightTerminalWorld
                 SetIfSupported(_environmentRef, "adjustment_saturation", 1.12f);
                 SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0032f);
             }
+            if (IsSurvivalMode && timeOfDay == DeploymentTimeOfDay.Night)
+            {
+                // The authored residential cluster has no emissive shell, so the global
+                // night preset would make its PBR materials unreadable. Keep the survival
+                // mood while retaining enough blue fill and ambient lift to read the plaza.
+                _sunLight.LightEnergy = Mathf.Max(_sunLight.LightEnergy, 0.42f);
+                _fillLight.LightEnergy = Mathf.Max(_fillLight.LightEnergy, 0.30f);
+                _environmentRef.AmbientLightEnergy = Mathf.Max(_environmentRef.AmbientLightEnergy, 0.48f);
+                _environmentRef.TonemapExposure = Mathf.Max(_environmentRef.TonemapExposure, 1.02f);
+                SetIfSupported(_environmentRef, "adjustment_brightness", 1.02f);
+                SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0030f);
+            }
             ApplyJianghaiOldCityAtmosphere(timeOfDay);
             if (_nvgActive)
             {

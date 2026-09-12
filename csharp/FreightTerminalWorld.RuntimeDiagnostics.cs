@@ -182,6 +182,7 @@ public partial class FreightTerminalWorld
             ("--validate-performance", static world => world.ValidateMapPerformance()),
             ("--validate-crowd-performance", static world => world.ValidateCrowdPerformance()),
             ("--capture-residential", static world => world.CaptureResidentialCommunity()),
+            ("--capture-residential-survival", static world => world.CaptureResidentialSurvival()),
             ("--capture-lantern-canal", static world => world.CaptureLanternCanal()),
             ("--capture-residential-diversity", static world => world.CaptureResidentialDiversity()),
             ("--capture-residential-street-art", static world => world.CaptureResidentialStreetArt()),

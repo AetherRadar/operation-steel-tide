@@ -150,6 +150,28 @@ public partial class FreightTerminalWorld
         BeginTrainingRangeSetup();
     }
 
+    private void OnSurvivalModeRequested()
+    {
+        // Survival is a standalone local module: no squad lobby, backend session,
+        // or extraction purchase flow is opened before the wave arena loads.
+        var selection = new DeploymentLoadoutSelection(
+            "m3a1",
+            "patrol",
+            LootGrade.Common,
+            60);
+        DeploymentMapRuntime.StageDeployment(new PendingExtractionDeployment(
+            DeploymentMapCatalog.ResidentialSurvivalId,
+            OperatorRole.Assault,
+            SquadSessionMode.Local,
+            "127.0.0.1",
+            selection));
+        _operationsOfficeActive = false;
+        _openingMusic.SetMenuActive(false);
+        _operationsOfficeBackdrop.SetPresentationActive(false);
+        GetTree().Paused = false;
+        GetTree().ReloadCurrentScene();
+    }
+
     private void OnDemolitionBackRequested()
     {
         if (_demolitionLobbyDeployment is not null || _demolitionJoinPending)

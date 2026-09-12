@@ -447,7 +447,7 @@ public static class GameLocalization
         Chinese["map_orbital_complex"] = "\u661f\u6f6e\u56de\u6536\u9635\u5217";
         Chinese["map_orbital_complex_subtitle"] = "\u98ce\u66b4\u575d\u68c0\u75ab\u533a";
         Chinese["map_residential_survival"] = "\u4f59\u6656\u751f\u6d3b\u7fa4";
-        Chinese["map_residential_survival_subtitle"] = "\u5c45\u6c11\u697c\u751f\u5b58\u533a  //  \u5317\u8fb0\u5e7f\u573a";
+        Chinese["map_residential_survival_subtitle"] = "\u751f\u5b58\u6ce2\u6b21  //  \u5317\u8fb0\u5e7f\u573a";
         Chinese["map_lantern_canal"] = "\u706f\u5f71\u6c34\u5df7";
         Chinese["map_lantern_canal_subtitle"] = "\u6c5f\u6d77\u5de5\u574a  //  \u9752\u74f7\u4e0e\u5f69\u4e91\u7ef8";
         Chinese["survival_wave"] = "\u611f\u67d3\u6f6e {0}\u5df2\u62b5\u8fbe";
@@ -455,6 +455,11 @@ public static class GameLocalization
         Chinese["survival_next"] = "\u4e0b\u6ce2 {0}s";
         Chinese["survival_active"] = "\u573a\u4e0a {0}";
         Chinese["survival_cleared"] = "\u6e05\u9664 {0}";
+        Chinese["survival_mode"] = "\u751f\u5b58\u6a21\u5f0f";
+        Chinese["survival_objective"] = "\u575a\u5b88\u5317\u8fb0\u5e7f\u573a\uff0c\u71ac\u8fc7\u611f\u67d3\u6f6e";
+        Chinese["survival_start"] = "\u751f\u5b58\u5f00\u59cb  //  \u611f\u67d3\u6f6e {0}";
+        Chinese["survival_complete"] = "\u751f\u5b58\u6a21\u5f0f\u5b8c\u6210";
+        Chinese["survival_result"] = "\u5b8c\u6210\u6ce2\u6b21 {0}  //  \u6e05\u9664\u611f\u67d3\u8005 {1}";
         Chinese["falltide_objective_breakers"] = "\u7a33\u5b9a\u98ce\u66b4\u7535\u7f51\u65ad\u8def\u5668";
         Chinese["falltide_objective_quarantine"] = "\u6388\u6743\u89e3\u9664\u68c0\u75ab\u5c01\u9501";
         Chinese["stabilize_breakers"] = "\u7a33\u5b9a\u65ad\u8def\u5668";
@@ -617,6 +622,9 @@ public static class GameLocalization
         Chinese["operations_training_index"] = "03  //  \u9776\u573a";
         Chinese["operations_training_title"] = "\u9776\u573a";
         Chinese["operations_training_detail"] = "\u9009 Bot  \u2192  \u9009\u67aa  \u2192  \u9009\u5f39  \u2192  \u8fdb\u5165\u5c04\u51fb\u573a";
+        Chinese["operations_survival_index"] = "04  //  \u751f\u5b58";
+        Chinese["operations_survival_title"] = "\u751f\u5b58\u6a21\u5f0f";
+        Chinese["operations_survival_detail"] = "\u641c\u522e  \u2192  \u611f\u67d3\u6f6e  \u2192  \u6e05\u9664 8 \u6ce2";
         Chinese["training_range"] = "\u9776\u573a";
         Chinese["training_range_status"] = "\u9776\u573a  //  \u5b9e\u5f39\u6d4b\u8bd5";
         Chinese["training_range_ready"] = "\u9009\u62e9\u76ee\u6807\u3001\u6b66\u5668\u548c\u5f39\u836f\uff0c\u5f00\u59cb\u5c04\u51fb";
@@ -879,6 +887,8 @@ public static class GameLocalization
         ["SECURE THE CRANE CONTROL LOG"] = "取得起重机控制日志",
         ["STABILIZE THE STORM-GRID BREAKERS"] = "\u7a33\u5b9a\u98ce\u66b4\u7535\u7f51\u65ad\u8def\u5668",
         ["AUTHORIZE THE QUARANTINE RELEASE"] = "\u6388\u6743\u89e3\u9664\u68c0\u75ab\u5c01\u9501",
+        ["SURVIVE THE INCOMING WAVES"] = "\u575a\u5b88\u5317\u8fb0\u5e7f\u573a\uff0c\u71ac\u8fc7\u611f\u67d3\u6f6e",
+        ["CLEAR THE NORTHSTAR PLAZA"] = "\u6e05\u9664\u5317\u8fb0\u5e7f\u573a\u7684\u611f\u67d3\u8005",
         // Retain the pre-backend wording for saved/replayed mission snapshots.
         ["REROUTE THE BREAKER BUS"] = "\u91cd\u7f6e\u65ad\u8def\u5668\u6bcd\u7ebf",
         ["PURGE THE QUARANTINE ARCHIVE"] = "\u6e05\u9664\u68c0\u75ab\u6863\u6848"

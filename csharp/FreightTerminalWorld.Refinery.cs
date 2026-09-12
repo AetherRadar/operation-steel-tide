@@ -339,7 +339,10 @@ public partial class FreightTerminalWorld
         }
 
         _hud.SetDeploymentMapSelection(deployment.MapId);
-        OnOperationsQuickStartRequested();
+        if (!IsSurvivalMode)
+        {
+            OnOperationsQuickStartRequested();
+        }
         if (deployment.SessionMode == SquadSessionMode.Join && !_squadNetwork.IsOnline)
         {
             BeginPendingExtractionJoin(deployment);

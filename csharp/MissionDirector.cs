@@ -46,6 +46,7 @@ public partial class MissionDirector : Node
     private double _missionStartedAt;
     private bool _resultSubmitted;
     private bool _configurationLocked;
+    private bool _localOnly;
     private string _backendMissionId = DefaultBackendMissionId;
     private List<string> _objectives = new(DefaultOfflineObjectives);
     private List<string> _objectiveIds = new();
@@ -116,11 +117,32 @@ public partial class MissionDirector : Node
         _backendObjectiveContractValid = true;
     }
 
+    /// <summary>
+    /// Configures an offline ruleset that still uses the director's phase and result
+    /// signals, without opening a backend session or publishing network objectives.
+    /// </summary>
+    public void ConfigureLocalMission(
+        string missionId,
+        IReadOnlyList<string> offlineObjectives,
+        IReadOnlyList<string>? offlineObjectiveIds = null,
+        IReadOnlyList<string>? offlineObjectiveLocalizationKeys = null)
+    {
+        ConfigureMission(missionId, offlineObjectives, offlineObjectiveIds, offlineObjectiveLocalizationKeys);
+        _localOnly = true;
+    }
+
     public override void _Ready()
     {
         _configurationLocked = true;
         ProcessMode = ProcessModeEnum.Always;
         _missionStartedAt = Time.GetTicksMsec() / 1000.0;
+        if (_localOnly)
+        {
+            _online = false;
+            _deploymentRemaining = SpawnProtectionSeconds;
+            CallDeferred(MethodName.PublishMission);
+            return;
+        }
         _backend = new BackendClient();
         _ = StartMissionAsync();
     }

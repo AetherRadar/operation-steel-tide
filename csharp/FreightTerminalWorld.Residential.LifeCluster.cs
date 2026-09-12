@@ -61,6 +61,10 @@ public partial class FreightTerminalWorld
         root.SetMeta("gameplay_contract", "visual-authored-shell-with-separate-anchors");
         community.AddChild(root);
         authored.Name = "AuthoredShoppingEnvironment";
+        // This Blender export keeps its ground in the XY plane (Z-up). Godot's
+        // world is Y-up, so rotate only the authored visual child into XZ while
+        // leaving gameplay anchors and collision in the map's native coordinates.
+        authored.RotationDegrees = new Vector3(90.0f, 0.0f, 0.0f);
         authored.AddToGroup("residential_life_cluster_authored_art");
         authored.SetMeta("source_license", "CC0");
         root.AddChild(authored);

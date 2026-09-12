@@ -60,6 +60,30 @@ corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
+[sub_resource type="StyleBoxFlat" id="StyleBox_survival_hover"]
+bg_color = Color(0.09, 0.043, 0.027, 0.98)
+border_width_left = 2
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.42, 0.18, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_survival_pressed"]
+bg_color = Color(0.12, 0.055, 0.032, 1)
+border_width_left = 3
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.55, 0.24, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
 [sub_resource type="StyleBoxFlat" id="StyleBox_quit_normal"]
 bg_color = Color(0.035, 0.042, 0.041, 0.96)
 border_width_left = 1
@@ -449,30 +473,107 @@ theme_override_font_sizes/font_size = 22
 text = ">"
 horizontal_alignment = 1
 
+[node name="SurvivalButton" type="Button" parent="Rail"]
+layout_mode = 0
+offset_left = 28.0
+offset_top = 708.0
+offset_right = 450.0
+offset_bottom = 824.0
+focus_neighbor_top = NodePath("../TrainingRangeButton")
+focus_neighbor_bottom = NodePath("../OperationsQuitButton")
+focus_mode = 2
+theme_override_colors/font_color = Color(0, 0, 0, 0)
+theme_override_colors/font_hover_color = Color(0, 0, 0, 0)
+theme_override_colors/font_pressed_color = Color(0, 0, 0, 0)
+theme_override_colors/font_focus_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/font_size = 1
+theme_override_styles/normal = SubResource("StyleBox_mode_normal")
+theme_override_styles/hover = SubResource("StyleBox_survival_hover")
+theme_override_styles/pressed = SubResource("StyleBox_survival_pressed")
+theme_override_styles/focus = SubResource("StyleBox_survival_hover")
+
+[node name="SurvivalAccent" type="ColorRect" parent="Rail/SurvivalButton"]
+layout_mode = 0
+offset_right = 4.0
+offset_bottom = 116.0
+mouse_filter = 2
+color = Color(1, 0.4, 0.18, 1)
+
+[node name="SurvivalIndex" type="Label" parent="Rail/SurvivalButton"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 13.0
+offset_right = 360.0
+offset_bottom = 31.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.47, 0.25, 1)
+theme_override_font_sizes/font_size = 13
+text = "04  //  SURVIVAL"
+
+[node name="SurvivalTitle" type="Label" parent="Rail/SurvivalButton"]
+layout_mode = 0
+offset_left = 21.0
+offset_top = 38.0
+offset_right = 352.0
+offset_bottom = 67.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.62, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 22
+text = "SURVIVAL"
+
+[node name="SurvivalDetail" type="Label" parent="Rail/SurvivalButton"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 78.0
+offset_right = 366.0
+offset_bottom = 99.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.82, 0.57, 0.43, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.86)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 13
+text = "SCAVENGE  →  WAVES  →  CLEAR 8"
+
+[node name="SurvivalArrow" type="Label" parent="Rail/SurvivalButton"]
+layout_mode = 0
+offset_left = 382.0
+offset_top = 43.0
+offset_right = 405.0
+offset_bottom = 73.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.55, 0.28, 1)
+theme_override_font_sizes/font_size = 22
+text = ">"
+horizontal_alignment = 1
+
 [node name="StatusDivider" type="ColorRect" parent="Rail"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 736.0
+offset_top = 858.0
 offset_right = 440.0
-offset_bottom = 737.0
+offset_bottom = 859.0
 mouse_filter = 2
 color = Color(0.17, 0.32, 0.28, 0.82)
 
 [node name="StatusPulse" type="ColorRect" parent="Rail"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 768.0
+offset_top = 884.0
 offset_right = 47.0
-offset_bottom = 775.0
+offset_bottom = 891.0
 mouse_filter = 2
 color = Color(0.24, 0.9, 0.64, 1)
 
 [node name="OperationsStatus" type="Label" parent="Rail"]
 layout_mode = 0
 offset_left = 60.0
-offset_top = 758.0
+offset_top = 874.0
 offset_right = 432.0
-offset_bottom = 814.0
+offset_bottom = 930.0
 theme_override_colors/font_color = Color(0.48, 0.86, 0.7, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
 theme_override_constants/shadow_offset_x = 2

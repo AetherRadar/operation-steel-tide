@@ -51,9 +51,9 @@ public static class DeploymentMapCatalog
             ResidentialSurvivalId,
             "MAP 04",
             "map_residential_survival",
-            "LASTLIGHT COMMUNITY",
+            "LASTLIGHT SURVIVAL",
             "map_residential_survival_subtitle",
-            "RESIDENTIAL SURVIVAL ZONE  //  NORTHSTAR PLAZA",
+            "WAVE SURVIVAL  //  NORTHSTAR PLAZA",
             true),
         new DeploymentMapOffer(
             LanternCanalId,
