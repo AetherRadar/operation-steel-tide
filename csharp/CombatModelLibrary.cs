@@ -604,20 +604,92 @@ internal sealed class AuthoredPreviewOperatorVisual
     public AuthoredPreviewOperatorVisual(
         Node3D root,
         OperatorVisualId visualId,
-        bool hasWeapon = false,
-        float uprightRollRadians = 0.0f)
+        bool hasWeapon = false)
     {
         Root = root;
         VisualId = visualId;
         HasWeapon = hasWeapon;
-        UprightRollRadians = uprightRollRadians;
     }
 
     public Node3D Root { get; }
     public OperatorVisualId VisualId { get; }
     public bool HasWeapon { get; }
-    /// <summary>Sideways roll applied to straighten a leaning rest pose (0 when untouched).</summary>
-    public float UprightRollRadians { get; }
+    internal void FreezePreviewPose()
+    {
+        if (VisualId == OperatorVisualId.Garrison)
+        {
+            return;
+        }
+
+        var animationPlayer = CombatModelLibrary.RequireAnimationPlayer(Root);
+        animationPlayer.Play("preview_stand");
+        animationPlayer.Seek(0.0, update: true);
+        animationPlayer.Advance(0.0);
+        animationPlayer.Pause();
+    }
+
+    internal float PreviewAlignmentError
+    {
+        get
+        {
+            if (VisualId == OperatorVisualId.Garrison)
+            {
+                return 0.0f;
+            }
+
+            var skeleton = CombatModelLibrary.RequireSkeleton(Root);
+            var hips = ResolveBoneIndex(skeleton, "mixamorig:Hips");
+            var head = ResolveBoneIndex(skeleton, "mixamorig:Head");
+            var leftShoulder = ResolveBoneIndex(skeleton, "mixamorig:LeftArm");
+            var rightShoulder = ResolveBoneIndex(skeleton, "mixamorig:RightArm");
+            if (hips < 0 || head < 0 || leftShoulder < 0 || rightShoulder < 0)
+            {
+                return float.NaN;
+            }
+
+#pragma warning disable CS0618
+            var skeletonToRoot = TransformRelativeToAncestor(skeleton, Root);
+            var hipsPosition = (skeletonToRoot * skeleton.GetBoneGlobalPose(hips)).Origin;
+            var headPosition = (skeletonToRoot * skeleton.GetBoneGlobalPose(head)).Origin;
+            var leftShoulderPosition = (skeletonToRoot * skeleton.GetBoneGlobalPose(leftShoulder)).Origin;
+            var rightShoulderPosition = (skeletonToRoot * skeleton.GetBoneGlobalPose(rightShoulder)).Origin;
+#pragma warning restore CS0618
+            return Mathf.Max(
+                Mathf.Abs(headPosition.X - hipsPosition.X),
+                Mathf.Abs(leftShoulderPosition.Y - rightShoulderPosition.Y));
+        }
+    }
+
+    private static int ResolveBoneIndex(Skeleton3D skeleton, string requestedName)
+    {
+        var suffix = requestedName[(requestedName.LastIndexOf(':') + 1)..];
+        for (var index = 0; index < skeleton.GetBoneCount(); index++)
+        {
+            var candidate = skeleton.GetBoneName(index).ToString();
+            if (candidate.Equals(requestedName, StringComparison.OrdinalIgnoreCase)
+                || candidate.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static Transform3D TransformRelativeToAncestor(Node3D node, Node3D ancestor)
+    {
+        var result = node.Transform;
+        var parent = node.GetParent();
+        while (parent != ancestor)
+        {
+            if (parent is not Node3D parent3D)
+            {
+                throw new InvalidOperationException($"{node.Name} is not a descendant of {ancestor.Name}.");
+            }
+            result = parent3D.Transform * result;
+            parent = parent.GetParent();
+        }
+        return result;
+    }
 }
 
 internal sealed class AuthoredOperatorVisual
@@ -1174,60 +1246,32 @@ internal sealed class AuthoredOperatorVisual
         ApplyWeaponSocketTransform(readied: false);
     }
 
-    /// <summary>Replaces the three optional world/paper-doll gear overlays.</summary>
+    /// <summary>Selects the Blender-authored standing pose for paper-doll previews.</summary>
     public void ApplyPreviewNeutralPose()
     {
-        var neck = ResolveBoneIndex(_skeleton, "mixamorig:Neck");
-        var head = ResolveBoneIndex(_skeleton, "mixamorig:Head");
-        if (neck < 0 || head < 0)
+        if (VisualId == OperatorVisualId.Garrison
+            || !CombatModelLibrary.UsesHy3dOperator(VisualId))
         {
             return;
         }
-#pragma warning disable CS0618
-        // Keep the small forward pitch used by the neutral loadout pose, then
-        // remove each asset's independent neck roll.  HY-3D Viper's rest neck
-        // is about eight degrees off around the actor's forward axis; applying
-        // a fixed world correction would make the other operators worse.
-        var neckPose = _skeleton.GetBoneGlobalPose(neck);
-        var uprightNeckBasis = RemovePreviewHeadRoll(
-            neckPose.Basis.Rotated(Vector3.Right, -0.12f).Orthonormalized());
-        _skeleton.SetBoneGlobalPoseOverride(
-            neck,
-            new Transform3D(uprightNeckBasis, neckPose.Origin),
-            1.0f,
-            persistent: true);
-        _skeleton.ForceUpdateBoneChildTransform(neck);
-
-        // Read the head after the neck override so the child's inherited roll is
-        // not overwritten by a stale pre-correction global pose.
-        var headPose = _skeleton.GetBoneGlobalPose(head);
-        var uprightHeadBasis = RemovePreviewHeadRoll(headPose.Basis);
-        _skeleton.SetBoneGlobalPoseOverride(
-            head,
-            new Transform3D(uprightHeadBasis, headPose.Origin),
-            1.0f,
-            persistent: true);
-#pragma warning restore CS0618
-        _skeleton.ForceUpdateBoneChildTransform(head);
+        const string previewAnimation = "preview_stand";
+        if (!AnimationPlayer.HasAnimation(previewAnimation))
+        {
+            throw new InvalidOperationException(
+                $"HY-3D operator {VisualId} is missing the authored {previewAnimation} animation.");
+        }
+        AnimationPlayer.Play(previewAnimation);
+        AnimationPlayer.Seek(0.0, update: true);
     }
 
-    private static Basis RemovePreviewHeadRoll(Basis basis)
+    public void FreezePreviewPose()
     {
-        var up = basis.Y.Normalized();
-        if (up.LengthSquared() <= 0.0001f)
+        if (VisualId == OperatorVisualId.Garrison)
         {
-            return basis.Orthonormalized();
+            return;
         }
-
-        // In skeleton space a positive Z rotation moves the up vector toward
-        // negative X.  Projecting onto the XY plane gives the actual roll while
-        // preserving the authored yaw and pitch of the gaze.
-        var roll = Mathf.Atan2(-up.X, up.Y);
-        if (Mathf.Abs(roll) < 0.0005f)
-        {
-            return basis.Orthonormalized();
-        }
-        return basis.Rotated(Vector3.Forward, roll).Orthonormalized();
+        AnimationPlayer.Advance(0.0);
+        AnimationPlayer.Pause();
     }
 
     public void SetEquipment(
@@ -3094,9 +3138,8 @@ internal static partial class CombatModelLibrary
                 asset.PreviewScenePath,
                 asset.PreviewNodes);
             buildObserver?.Invoke(PreviewOperatorBuildStage.SourceCreated, source, null);
-            // The preview uses the authored rest pose. Any alignment change
+            // The preview uses an authored standing pose. Any alignment change
             // belongs in the Blender source asset.
-            const float uprightRollRadians = 0.0f;
             var sourceBounds = asset.UsesQuaterniusRig
                 ? ComputeBounds(source)
                 : (MeshCount: 1, Size: PreviewOperatorSourceSize, Center: PreviewOperatorSourceCenter);
@@ -3142,8 +3185,7 @@ internal static partial class CombatModelLibrary
             var visual = new AuthoredPreviewOperatorVisual(
                 wrapper,
                 visualId,
-                hasWeapon: asset.UsesQuaterniusRig && weaponBuild is not null,
-                uprightRollRadians: uprightRollRadians);
+                hasWeapon: asset.UsesQuaterniusRig && weaponBuild is not null);
             source = null;
             wrapper = null;
             return visual;

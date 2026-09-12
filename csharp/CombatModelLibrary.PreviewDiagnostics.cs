@@ -149,12 +149,12 @@ internal static partial class CombatModelLibrary
     }
 
     /// <summary>
-    /// Builds every operator preview and verifies that no runtime pose
-    /// correction is applied. Any visual alignment issue belongs in Blender.
+    /// Samples the authored standing action and measures lateral head alignment
+    /// and shoulder height. Any visual alignment issue belongs in Blender.
     /// </summary>
     internal static PreviewOperatorUprightInspection InspectPreviewOperatorUprightForDiagnostics()
     {
-        var rolls = new Dictionary<OperatorVisualId, float>();
+        var errors = new Dictionary<OperatorVisualId, float>();
         var allBuilt = true;
         foreach (var visualId in new[]
         {
@@ -170,12 +170,20 @@ internal static partial class CombatModelLibrary
             try
             {
                 visual = InstantiatePreviewOperator(visualId);
-                rolls[visualId] = visual.UprightRollRadians;
+                if (visualId != OperatorVisualId.Garrison
+                    && Engine.GetMainLoop() is SceneTree tree)
+                {
+                    tree.Root.AddChild(visual.Root);
+                    visual.FreezePreviewPose();
+                }
+                errors[visualId] = visualId == OperatorVisualId.Garrison
+                    ? 0.0f
+                    : visual.PreviewAlignmentError;
             }
             catch
             {
                 allBuilt = false;
-                rolls[visualId] = float.NaN;
+                errors[visualId] = float.NaN;
             }
             finally
             {
@@ -185,14 +193,14 @@ internal static partial class CombatModelLibrary
                 }
             }
         }
-        return new PreviewOperatorUprightInspection(rolls, allBuilt);
+        return new PreviewOperatorUprightInspection(errors, allBuilt);
     }
 
     internal readonly record struct PreviewOperatorUprightInspection(
-        Dictionary<OperatorVisualId, float> UprightRollRadiansByVisual,
+        Dictionary<OperatorVisualId, float> AlignmentErrorByVisual,
         bool AllBuilt)
     {
         public bool Valid => AllBuilt
-            && UprightRollRadiansByVisual.Values.All(roll => !float.IsNaN(roll) && Mathf.Abs(roll) <= 0.0001f);
+            && AlignmentErrorByVisual.Values.All(error => !float.IsNaN(error) && error <= 0.02f);
     }
 }

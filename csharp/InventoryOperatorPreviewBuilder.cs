@@ -18,11 +18,17 @@ internal static class InventoryOperatorPreviewBuilder
         EquipmentItem? backpack = null)
     {
         Node3D previewRoot;
+        AuthoredPreviewOperatorVisual? previewVisual = null;
+        AuthoredOperatorVisual? staticVisual = null;
         if (!staticLoadout)
         {
-            previewRoot = CombatModelLibrary
-                .InstantiatePreviewOperator(requestedVisual, weaponBuild, helmet, bodyArmor, backpack)
-                .Root;
+            previewVisual = CombatModelLibrary.InstantiatePreviewOperator(
+                requestedVisual,
+                weaponBuild,
+                helmet,
+                bodyArmor,
+                backpack);
+            previewRoot = previewVisual.Root;
         }
         else
         {
@@ -33,17 +39,26 @@ internal static class InventoryOperatorPreviewBuilder
                 helmet: helmet,
                 bodyArmor: bodyArmor,
                 backpack: backpack);
+            staticVisual = visual;
             visual.AnimationPlayer.Stop();
             visual.ApplyPreviewNeutralPose();
-            var staticBounds = CombatModelLibrary.ComputeBounds(visual.Root);
-            if (staticBounds.MeshCount > 0)
-            {
-                visual.Root.Position -= staticBounds.Center;
-            }
             previewRoot = visual.Root;
         }
 
         root.AddChild(previewRoot);
+        if (previewVisual is not null)
+        {
+            previewVisual.FreezePreviewPose();
+        }
+        if (staticVisual is not null)
+        {
+            staticVisual.FreezePreviewPose();
+            var staticBounds = CombatModelLibrary.ComputeBounds(staticVisual.Root);
+            if (staticBounds.MeshCount > 0)
+            {
+                staticVisual.Root.Position -= staticBounds.Center;
+            }
+        }
     }
 }
 

@@ -33,10 +33,17 @@ into the right-hand bone frame before the locomotion and carry passes. The
 exported `MagpieRightHandPatch` is part of the final skinned character; it is
 not a runtime primitive or pose workaround.
 
-The repair export keeps the armature in pose mode. Blender's glTF exporter
-otherwise samples every action from the bind pose, which turns the prone,
-downed, and death clips into a static standing pose even though their action
-curves are present.
+The repair export keeps the imported armature in pose mode and marks every
+imported action as a fake user. Blender's glTF exporter otherwise samples every
+action from the bind pose, which turns the prone, downed, and death clips into
+a static standing pose even though their action curves are present.
+
+Each delivered operator also carries a 39th Blender-authored `preview_stand`
+action. It places the hips over the planted feet, levels the spine and
+shoulders, and preserves the authored foot contact for the straight-on
+homepage/loadout paper-doll. The runtime selects and pauses this action; it does
+not apply a corrective skeleton transform. The reproducible authoring pass is
+`scripts/blender/author_hy3d_preview_stand.py`.
 
 The delivered Viper also carries bone-parented `LeftPalmFrame`,
 `RightPalmFrame`, `LeftWristFrame`, `RightWristFrame`, shoulder frames,
@@ -54,11 +61,11 @@ Delivered files (all self-contained GLBs with embedded textures):
 
 | Role | File | Size | SHA-256 |
 | --- | --- | ---: | --- |
-| Viper | `viper.glb` | 21,687,648 bytes | `CD454A45AAD26D359964A14DC9D513CDF7B030DAC550A4F71B7E6F3D63D728B5` |
-| Heron | `heron.glb` | 21,433,124 bytes | `81A190D7C4F54E4D8381E7E647A674799F4BEB06F3ED3A2C4B1283B522C8539F` |
-| Lynx | `lynx.glb` | 22,709,020 bytes | `2F8256A0E424FF7C1BA9C12B121FAF77C7A7E49E939EC55044EE13B4C96A0091` |
-| Magpie | `magpie.glb` | 21,087,872 bytes | `F68A06B413B10F8C81C3AD929CAE46F5052C801CE389C465A060788C63A866E9` |
-| Jackal | `jackal.glb` | 21,915,992 bytes | `088ACE1CCA20E4CF708670B8E551DA213055D93B23935FD012A7E8BC5E7F4173` |
+| Viper | `viper.glb` | 21,736,428 bytes | `B1CDA6190C36710D2B6BD153E42C2BC550E3A4810486639C054C857C01B2F3BE` |
+| Heron | `heron.glb` | 21,476,084 bytes | `62A7BEEE92A969E4DEB4BF2B0A2EC6954D5A55C3C7C90D95F3316899D05AF351` |
+| Lynx | `lynx.glb` | 22,770,236 bytes | `8E1D71FC4DE2CC63D6B436F0D4228296046349310E952FAE86CB3B370BB03089` |
+| Magpie | `magpie.glb` | 21,134,168 bytes | `02DFF23FF8BB0C900E8680FCA9793B38D236893420BA64B471211443C8160677` |
+| Jackal | `jackal.glb` | 21,976,500 bytes | `1842272C00E794F7ACF3832965CFC85B1056808274283702ED4C9E03FDADC7DA` |
 
 Rebuild one role (Windows):
 

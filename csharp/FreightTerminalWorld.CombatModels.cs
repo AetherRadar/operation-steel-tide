@@ -253,15 +253,19 @@ public partial class FreightTerminalWorld
         var operatorGeometry = operatorModel.Loaded
             && operatorModel.RequiredNodes
             && operatorModel.MeshCount >= 1
-            && operatorModel.MaterialCount >= 8
+            // The authored garrison operator is exported as one packed PBR
+            // material; geometry and bounds remain the quality gates here.
+            && operatorModel.MaterialCount >= 1
             && operatorModel.Size.X is >= 0.55f and <= 1.25f
             && operatorModel.Size.Y is >= 1.75f and <= 2.3f
             && operatorModel.Size.Z is >= 0.3f and <= 0.8f;
         var previewOperatorGeometry = previewOperator.Loaded
             && previewOperator.RequiredNodes
             && previewOperator.MeshCount >= 1
-            && previewOperator.MaterialCount >= 8
-            && previewOperator.Size.X is >= 1.3f and <= 1.9f
+            // The rebuilt enemy operator is one authored skinned mesh with a
+            // single packed material and a narrower 2.55 m paper-doll frame.
+            && previewOperator.MaterialCount >= 1
+            && previewOperator.Size.X is >= 0.7f and <= 1.3f
             && previewOperator.Size.Y is >= 2.45f and <= 2.65f
             && previewOperator.Size.Z is >= 0.35f and <= 0.8f;
         var gsh18Geometry = gsh18.Loaded
@@ -401,6 +405,8 @@ public partial class FreightTerminalWorld
             + $"enemies_authored={enemiesAuthored} enemies={livingEnemies.Length} "
             + $"faction_appearance={factionAppearance} garrison_color={garrisonColor} "
             + $"rival_colors={rivals.Select(enemy => enemy.AuthoredTeamColorForDiagnostics).Distinct().Count()} "
+            + $"preview_upright={previewUpright.Valid}/"
+            + $"{string.Join(',', previewUpright.AlignmentErrorByVisual.Select(pair => $"{pair.Key}:{pair.Value:F4}"))} "
             + $"preview_ownership={previewOwnership.Valid} "
             + $"preview_source_cleanup={previewOwnership.SourceFreedBeforeWrapper} "
             + $"preview_wrapper_cleanup={previewOwnership.WrapperFreedAfterOwnership}/"

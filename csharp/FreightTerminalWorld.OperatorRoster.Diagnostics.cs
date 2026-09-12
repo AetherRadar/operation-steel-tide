@@ -76,6 +76,7 @@ public partial class FreightTerminalWorld
 
                 previewVisual = CombatModelLibrary.InstantiatePreviewOperator(visualId, rifle);
                 AddChild(previewVisual.Root);
+                previewVisual.FreezePreviewPose();
                 previewStatic = !CombatModelLibrary.RequireAnimationPlayer(previewVisual.Root).IsPlaying();
                 previewWeapon = previewVisual.HasWeapon;
             }

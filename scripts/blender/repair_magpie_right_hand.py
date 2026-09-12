@@ -136,11 +136,15 @@ def main():
     mesh = max(meshes, key=lambda obj: len(obj.data.polygons), default=None)
     if armature is None or mesh is None:
         raise RuntimeError("input GLB has no armature and visual mesh")
-    # Keep the imported armature in pose mode while exporting. Setting
-    # pose_position to REST here makes Blender's glTF exporter sample every
-    # action from the bind pose, which silently turns prone/death clips into
-    # static standing poses. The patch frame below already uses data-bone
-    # rest matrices, so no pose-position override is needed.
+    # Keep every imported gameplay clip discoverable by the glTF exporter.
+    # The importer stores the clips in NLA strips; fake users keep that full
+    # action library alive while the repaired mesh is added. Leave the
+    # armature in its imported pose mode so the exporter evaluates each strip
+    # instead of broadcasting one static rest pose into every action. The
+    # patch frame below already uses data-bone rest matrices, so no
+    # pose-position override is needed.
+    for action in bpy.data.actions:
+        action.use_fake_user = True
     bpy.context.view_layer.update()
     patch, faces, vertices = make_patch(mesh, armature)
     bpy.ops.object.select_all(action="SELECT")
