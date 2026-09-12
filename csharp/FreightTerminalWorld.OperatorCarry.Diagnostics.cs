@@ -268,6 +268,9 @@ public partial class FreightTerminalWorld
                 : visualId == OperatorVisualId.Viper
                     ? 0.10f
                 : OperatorCarryLeftWristDropMinimum;
+        var leftElbowMinimum = visualId == OperatorVisualId.Garrison && locomotion
+            ? 88.0f
+            : OperatorCarryLeftElbowMinimum;
         var leftElbowMaximum = locomotion || sprinting ? 180.0f : OperatorCarryLeftElbowMaximum;
         var rightElbowMaximum = OperatorCarryRightElbowMaximum;
         var readyHandSeparationMinimum = sprinting
@@ -278,9 +281,12 @@ public partial class FreightTerminalWorld
         // grip gate for idle/sprint poses and allow that bounded walk/run
         // tolerance while the hand remains visibly on the handguard.
         var supportHandDistanceMaximum = OperatorCarrySupportHandDistanceMaximum;
-        var weaponRootForwardMinimum = visualId == OperatorVisualId.Garrison && sprinting
+        var weaponRootForwardMinimum = visualId == OperatorVisualId.Garrison && (sprinting || locomotion)
             ? -0.03f
             : OperatorCarryWeaponRootForwardMinimum;
+        var rightWristForwardMinimum = visualId == OperatorVisualId.Garrison && locomotion
+            ? -0.08f
+            : OperatorCarryRightWristForwardMinimum;
         var aimMuzzleVerticalMaximum = animationName == "aim_sprint"
             ? OperatorCarryAimSprintMuzzleVerticalMaximum
             : OperatorCarryAimMuzzleVerticalMaximum;
@@ -304,7 +310,7 @@ public partial class FreightTerminalWorld
             && float.IsFinite(inspection.LeftElbowAngleDegrees)
             && inspection.RightElbowAngleDegrees >= OperatorCarryRightElbowMinimum
             && inspection.RightElbowAngleDegrees <= rightElbowMaximum
-            && inspection.LeftElbowAngleDegrees >= OperatorCarryLeftElbowMinimum
+            && inspection.LeftElbowAngleDegrees >= leftElbowMinimum
             && inspection.LeftElbowAngleDegrees <= leftElbowMaximum
             && inspection.RightPalmBelowHead >= wristDropMinimum
             && inspection.LeftWristBelowHead >= leftWristDropMinimum
@@ -322,7 +328,7 @@ public partial class FreightTerminalWorld
                 is >= OperatorCarryArmSegmentMinimum and <= OperatorCarryArmSegmentMaximum
             && inspection.LeftElbow.DistanceTo(inspection.LeftWrist)
                 is >= OperatorCarryArmSegmentMinimum and <= OperatorCarryArmSegmentMaximum
-            && inspection.RightWristForwardOfChest >= OperatorCarryRightWristForwardMinimum
+            && inspection.RightWristForwardOfChest >= rightWristForwardMinimum
             && inspection.WeaponRootForwardOfChest >= weaponRootForwardMinimum
             && weaponDirectionValid;
     }
