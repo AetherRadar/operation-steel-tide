@@ -18,6 +18,11 @@ public partial class FreightTerminalWorld
             ConfigureRefineryMinimap();
             return;
         }
+        if (IsLanternCanalMap)
+        {
+            ConfigureLanternCanalMinimap();
+            return;
+        }
         var landmarks = new List<TacticalMapLandmark>
         {
             new(DeploymentPoint, "minimap_deploy", "DEPLOY", new Color(0.36f, 0.82f, 1.0f)),

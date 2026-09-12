@@ -1,0 +1,34 @@
+{
+  "geometryIndicesNormalsFinite": "PASS",
+  "triangles": 11611673,
+  "degenerateTriangles": 0,
+  "opposedNormalTriangles": 0,
+  "maxNormalLengthError": 1.1920928955078125e-07,
+  "embeddedImagesChecked": 215,
+  "noExternalTextures": true,
+  "nodeLightCameraReferences": "PASS",
+  "namedCameras": 6,
+  "preservedExistingMeshGroups": 177,
+  "changedExistingMeshes": [
+    "10_House_E_01",
+    "10_House_E_05"
+  ],
+  "preservedPagodas": 7,
+  "allPriorWaterAndBridgeGroupsPreserved": true,
+  "allInheritedMaterialDefinitionsPreserved": true,
+  "localExtractMatches": "PASS",
+  "sampledClearance": {
+    "tested": 357,
+    "passed": 357,
+    "failed": 0
+  },
+  "limits": "Sampled line segments, not a human capsule, full collision/navigation audit, engineering check or phone benchmark.",
+  "losslessBufferSharing": {
+    "deduplicatedBufferViews": 2016,
+    "binaryPayloadBytesSaved": 23803608,
+    "method": "byte-identical buffer sharing; same index/attribute/image bytes, target and stride; no new extension"
+  },
+  "fileBytesBefore": 594277332,
+  "fileBytesAfter": 589056208,
+  "netBytesChange": -5221124
+}

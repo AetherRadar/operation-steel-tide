@@ -1,0 +1,572 @@
+{
+  "version": "2.5",
+  "parent": "lantern_canal_world_v2_4.glb",
+  "parentSHA256": "b211179c167df7865dbf96189ee6d24ab9983607fe188ac684a2a86460aefd88",
+  "parentBytes": 594277332,
+  "output": "lantern_canal_world_v2_5.glb",
+  "outputSHA256": "ab651fc398e9c77432d9ece3e434220fbff02d87f6dffe24edc5d7d883037cdb",
+  "bytes": 589056208,
+  "before": {
+    "triangles": 11214651,
+    "vertices": 14425997,
+    "meshAssets": 179,
+    "materials": 160,
+    "embeddedImages": 194,
+    "boundsConstructionZUp": [
+      [
+        -80.0,
+        -86.0,
+        -5.099999904632568
+      ],
+      [
+        80.0,
+        192.0,
+        92.89000701904297
+      ]
+    ]
+  },
+  "after": {
+    "triangles": 11611673,
+    "vertices": 14866651,
+    "meshAssets": 187,
+    "materials": 179,
+    "embeddedImages": 215,
+    "boundsConstructionZUp": [
+      [
+        -80.0,
+        -86.0,
+        -5.099999904632568
+      ],
+      [
+        80.0,
+        192.0,
+        92.89000701904297
+      ]
+    ]
+  },
+  "triangleDelta": 397022,
+  "counts": {
+    "removed_existing_triangles": 1360,
+    "new_floorboards": 1382,
+    "ceiling_beam_pieces": 28,
+    "ceiling_rafter_pieces": 118,
+    "stair_treads": 88,
+    "stair_flights": 8,
+    "stair_return_landings": 4,
+    "lattice_panels": 4,
+    "pottery_workspace_tiles": 80,
+    "new_open_vessels": 186,
+    "stools": 4,
+    "potters_wheels": 2,
+    "clay_workbenches": 1,
+    "glaze_stations": 1,
+    "shelf_units": 11,
+    "pottery_shelves": 6,
+    "wall_scrolls": 4,
+    "pottery_rooms_furnished": 3,
+    "framed_interior_lamps": 10,
+    "tea_sets": 1,
+    "armchairs": 3,
+    "storage_chests": 6,
+    "refined_shops": 2,
+    "handlooms": 2,
+    "warp_threads": 122,
+    "heddle_threads": 124,
+    "fabric_bolts": 76,
+    "silk_spools": 50,
+    "fabric_shelves": 5,
+    "textile_rooms_furnished": 3,
+    "draped_silks": 1,
+    "tailor_shears": 1,
+    "embroidery_frames": 1,
+    "garment_display_racks": 1,
+    "named_inspection_cameras": 6
+  },
+  "changedExistingMeshes": [
+    "10_House_E_01",
+    "10_House_E_05"
+  ],
+  "unchangedMeshNames": [
+    "00_Ground_and_quays",
+    "40_Boat_01",
+    "40_Boat_02",
+    "40_Boat_03",
+    "40_Boat_04",
+    "40_Boat_05",
+    "40_Boat_06",
+    "40_Boat_07",
+    "40_Boat_08",
+    "40_Boat_09",
+    "40_Boat_10",
+    "40_Boat_11",
+    "40_Boat_12",
+    "40_Boat_13",
+    "40_Boat_14",
+    "40_BranchBoat_01",
+    "40_BranchBoat_02",
+    "40_BranchBoat_03",
+    "40_BranchBoat_04",
+    "41_Quayside_moorings_and_pots",
+    "42_Lantern_festoons",
+    "43_Tower_market",
+    "44_Outer_gardens",
+    "45_Rear_observatory_terrace",
+    "10_House_W_01",
+    "10_House_W_03",
+    "10_House_W_04",
+    "10_House_W_05",
+    "10_House_W_06",
+    "10_House_E_02",
+    "10_House_E_03",
+    "10_House_E_04",
+    "10_House_E_06",
+    "11_OuterHouse_W_01",
+    "11_OuterHouse_W_02",
+    "11_OuterHouse_W_03",
+    "11_OuterHouse_W_04",
+    "11_OuterHouse_W_05",
+    "11_OuterHouse_W_06",
+    "11_OuterHouse_W_07",
+    "11_OuterHouse_W_08",
+    "11_OuterHouse_E_01",
+    "11_OuterHouse_E_02",
+    "11_OuterHouse_E_03",
+    "11_OuterHouse_E_04",
+    "11_OuterHouse_E_05",
+    "11_OuterHouse_E_06",
+    "11_OuterHouse_E_07",
+    "11_OuterHouse_E_08",
+    "12_TowerQuarter_house_00",
+    "12_TowerQuarter_house_01",
+    "12_TowerQuarter_house_02",
+    "12_TowerQuarter_house_03",
+    "12_TowerQuarter_house_04",
+    "12_TowerQuarter_house_05",
+    "20_Tower_01_Jade_Gate",
+    "20_Tower_02_Lantern_Tower",
+    "20_Tower_03_West_Cloud",
+    "20_Tower_04_East_Cloud",
+    "20_Tower_05_Crown_Observatory",
+    "20_Tower_06_West_Garden",
+    "20_Tower_07_East_Garden",
+    "30_Skybridge_01",
+    "30_Skybridge_02",
+    "30_Skybridge_03",
+    "30_Skybridge_04",
+    "30_Skybridge_05",
+    "30_Skybridge_06",
+    "30_Skybridge_07",
+    "30_Skybridge_08",
+    "30_Skybridge_09",
+    "30_Skybridge_10",
+    "30_Skybridge_11",
+    "30_Skybridge_12",
+    "30_Skybridge_13",
+    "30_Skybridge_14",
+    "10_House_W_02_TeaHouseInterior",
+    "50_V21_Teahouse_entrance_joinery",
+    "51_V21_Teahouse_screens_and_shelf_details",
+    "52_V21_Teahouse_balcony_hardware",
+    "53_V21_Teahouse_quay_and_landing",
+    "54_V21_Teahouse_small_timber_pier",
+    "55_V21_Existing_Boat03_canopy_and_fittings",
+    "56_V21_Teahouse_floorboards_and_ceiling",
+    "57_V22_Qinghe_potted_shrub_canopies",
+    "58_V22_Qinghe_balcony_flower_boxes",
+    "59_V22_Qinghe_stone_plinth_facing",
+    "01_Canal_water",
+    "60_V23_Submerged_riverbed",
+    "61_V23_Submerged_stones_and_waterplants",
+    "62_V23_Static_canal_carp",
+    "62_V23_Static_surface_ripple_glints",
+    "31_CanalFootbridge_01",
+    "31_CanalFootbridge_02",
+    "31_CanalFootbridge_03",
+    "31_CanalFootbridge_04",
+    "31_CanalFootbridge_05",
+    "31_CanalFootbridge_06",
+    "32_CrossChannelBridge_01",
+    "32_CrossChannelBridge_02",
+    "32_CrossChannelBridge_03",
+    "32_CrossChannelBridge_04",
+    "32_CrossChannelBridge_05",
+    "32_CrossChannelBridge_06",
+    "32_CrossChannelBridge_07",
+    "32_CrossChannelBridge_08",
+    "33_SideLaneBridge_-1_72",
+    "33_SideLaneBridge_-1_97",
+    "33_SideLaneBridge_-1_132",
+    "33_SideLaneBridge_-1_149",
+    "33_SideLaneBridge_1_72",
+    "33_SideLaneBridge_1_97",
+    "33_SideLaneBridge_1_132",
+    "33_SideLaneBridge_1_149",
+    "63_V23_Skybridge_craft_01",
+    "63_V23_Skybridge_craft_02",
+    "63_V23_Skybridge_craft_03",
+    "63_V23_Skybridge_craft_04",
+    "63_V23_Skybridge_craft_05",
+    "63_V23_Skybridge_craft_06",
+    "63_V23_Skybridge_craft_07",
+    "63_V23_Skybridge_craft_08",
+    "63_V23_Skybridge_craft_09",
+    "63_V23_Skybridge_craft_10",
+    "63_V23_Skybridge_craft_11",
+    "63_V23_Skybridge_craft_12",
+    "63_V23_Skybridge_craft_13",
+    "63_V23_Skybridge_craft_14",
+    "70_V23_Retail_01_books",
+    "70_V23_Retail_02_bakery",
+    "70_V23_Retail_03_silk",
+    "70_V23_Retail_04_medicine",
+    "70_V23_Retail_05_inn",
+    "70_V23_Retail_06_ceramics",
+    "70_V23_Retail_07_inn",
+    "70_V23_Retail_08_produce",
+    "70_V23_Retail_09_lanterns",
+    "70_V23_Retail_10_silk",
+    "70_V23_Retail_11_books",
+    "70_V23_Retail_12_medicine",
+    "70_V23_Retail_13_inn",
+    "70_V23_Retail_14_books",
+    "70_V23_Retail_15_bakery",
+    "70_V23_Retail_16_silk",
+    "70_V23_Retail_17_ceramics",
+    "70_V23_Retail_18_produce",
+    "70_V23_Retail_19_lanterns",
+    "70_V23_Retail_20_medicine",
+    "70_V23_Retail_21_inn",
+    "70_V23_Retail_22_books",
+    "70_V23_Retail_23_bakery",
+    "70_V23_Retail_24_silk",
+    "70_V23_Retail_25_ceramics",
+    "70_V23_Retail_26_produce",
+    "70_V23_Retail_27_lanterns",
+    "70_V23_Retail_28_medicine",
+    "70_V23_Retail_29_inn",
+    "70_V23_Retail_30_books",
+    "70_V23_Retail_31_bakery",
+    "70_V23_Retail_32_silk",
+    "70_V23_Retail_33_ceramics",
+    "80_V24_Circulation_books",
+    "81_V24_books_Floor_1",
+    "81_V24_books_Floor_2",
+    "81_V24_books_Floor_3",
+    "80_V24_Circulation_bakery",
+    "81_V24_bakery_Floor_1",
+    "81_V24_bakery_Floor_2",
+    "81_V24_bakery_Floor_3",
+    "80_V24_Circulation_medicine",
+    "81_V24_medicine_Floor_1",
+    "81_V24_medicine_Floor_2",
+    "81_V24_medicine_Floor_3",
+    "80_V24_Circulation_inn",
+    "81_V24_inn_Floor_1",
+    "81_V24_inn_Floor_2",
+    "81_V24_inn_Floor_3"
+  ],
+  "newGeometryTriangles": {
+    "80_V25_Circulation_ceramics": 49880,
+    "91_V25_ceramics_Floor_1": 30752,
+    "91_V25_ceramics_Floor_2": 99100,
+    "91_V25_ceramics_Floor_3": 43956,
+    "80_V25_Circulation_silk": 49880,
+    "91_V25_silk_Floor_1": 34042,
+    "91_V25_silk_Floor_2": 29460,
+    "91_V25_silk_Floor_3": 61312
+  },
+  "shopScope": [
+    {
+      "name": "10_House_E_01",
+      "position": [
+        23.0,
+        -67
+      ],
+      "size": [
+        15.2,
+        12.1
+      ],
+      "floors": 3,
+      "base": 1.16,
+      "angle": -1.5707963267948966,
+      "trade": "ceramics",
+      "title": "青瓷坊",
+      "retail": "70_V23_Retail_06_ceramics",
+      "door": 1.9000000000000004,
+      "sillMaterialName": "Warm ochre plaster",
+      "removed": {
+        "floor_ceiling_boxes": 4,
+        "upper_front_sill_strips": 2,
+        "balcony_window_components": 44
+      },
+      "groups": [
+        "80_V25_Circulation_ceramics",
+        "91_V25_ceramics_Floor_1",
+        "91_V25_ceramics_Floor_2",
+        "91_V25_ceramics_Floor_3"
+      ],
+      "stairGeometry": {
+        "xmin": 3.7399999999999998,
+        "xmax": 7.1,
+        "x1": 4.529999999999999,
+        "x2": 6.31,
+        "y0": -0.1,
+        "yend": 3.2,
+        "back": 4.5,
+        "width": 1.42,
+        "n": 11,
+        "fh": 3.8,
+        "hole": [
+          3.7399999999999998,
+          7.1,
+          -0.24000000000000002,
+          4.6
+        ],
+        "floorHeight": 3.8,
+        "risePerStep": 0.17272727272727273,
+        "treadDepth": 0.30000000000000004,
+        "clearWidthApprox": 1.25
+      }
+    },
+    {
+      "name": "10_House_E_05",
+      "position": [
+        23.0,
+        21
+      ],
+      "size": [
+        15.2,
+        12.1
+      ],
+      "floors": 3,
+      "base": 1.16,
+      "angle": -1.5707963267948966,
+      "trade": "silk",
+      "title": "彩云绸铺",
+      "retail": "70_V23_Retail_10_silk",
+      "door": 1.9000000000000004,
+      "sillMaterialName": "Tower ivory lime",
+      "removed": {
+        "floor_ceiling_boxes": 4,
+        "upper_front_sill_strips": 2,
+        "balcony_window_components": 43
+      },
+      "groups": [
+        "80_V25_Circulation_silk",
+        "91_V25_silk_Floor_1",
+        "91_V25_silk_Floor_2",
+        "91_V25_silk_Floor_3"
+      ],
+      "stairGeometry": {
+        "xmin": 3.7399999999999998,
+        "xmax": 7.1,
+        "x1": 4.529999999999999,
+        "x2": 6.31,
+        "y0": -0.1,
+        "yend": 3.2,
+        "back": 4.5,
+        "width": 1.42,
+        "n": 11,
+        "fh": 3.8,
+        "hole": [
+          3.7399999999999998,
+          7.1,
+          -0.24000000000000002,
+          4.6
+        ],
+        "floorHeight": 3.8,
+        "risePerStep": 0.17272727272727273,
+        "treadDepth": 0.30000000000000004,
+        "clearWidthApprox": 1.25
+      }
+    }
+  ],
+  "newPunctualLights": [
+    {
+      "name": "青瓷坊/拉坯间/1",
+      "positionConstructionZUp": [
+        25.6,
+        -64.0,
+        3.8949999666213992
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 115,
+      "range": 8
+    },
+    {
+      "name": "青瓷坊/赏瓷雅室/1",
+      "positionConstructionZUp": [
+        24.9,
+        -63.9,
+        7.694999966621399
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 90,
+      "range": 8
+    },
+    {
+      "name": "青瓷坊/赏瓷雅室/2",
+      "positionConstructionZUp": [
+        19.65,
+        -63.9,
+        7.694999966621399
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 90,
+      "range": 8
+    },
+    {
+      "name": "青瓷坊/瓷坯晾架/1",
+      "positionConstructionZUp": [
+        24.9,
+        -63.9,
+        11.494999966621398
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 90,
+      "range": 8
+    },
+    {
+      "name": "青瓷坊/瓷坯晾架/2",
+      "positionConstructionZUp": [
+        19.65,
+        -63.9,
+        11.494999966621398
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 90,
+      "range": 8
+    },
+    {
+      "name": "彩云绸铺/织造间/1",
+      "positionConstructionZUp": [
+        25.6,
+        24.0,
+        3.8949999666213992
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 115,
+      "range": 8
+    },
+    {
+      "name": "彩云绸铺/裁衣雅室/1",
+      "positionConstructionZUp": [
+        24.9,
+        24.1,
+        7.694999966621399
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 90,
+      "range": 8
+    },
+    {
+      "name": "彩云绸铺/裁衣雅室/2",
+      "positionConstructionZUp": [
+        19.65,
+        24.1,
+        7.694999966621399
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 90,
+      "range": 8
+    },
+    {
+      "name": "彩云绸铺/绸缎库/1",
+      "positionConstructionZUp": [
+        24.9,
+        24.1,
+        11.494999966621398
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 90,
+      "range": 8
+    },
+    {
+      "name": "彩云绸铺/绸缎库/2",
+      "positionConstructionZUp": [
+        19.65,
+        24.1,
+        11.494999966621398
+      ],
+      "color": [
+        1.0,
+        0.73,
+        0.43
+      ],
+      "intensity": 90,
+      "range": 8
+    }
+  ],
+  "losslessOptimization": {
+    "deduplicatedBufferViews": 2016,
+    "binaryPayloadBytesSaved": 23803608,
+    "method": "byte-identical buffer sharing; same index/attribute/image bytes, target and stride; no new extension"
+  },
+  "beforeDedupeBinaryPayloadBytes": 610984718,
+  "localExtract": {
+    "file": "craft_workshops_v2_5_detail.glb",
+    "bytes": 45575920,
+    "stats": {
+      "triangles": 578532,
+      "vertices": 670943,
+      "meshAssets": 12,
+      "materials": 61,
+      "embeddedImages": 75,
+      "boundsConstructionZUp": [
+        [
+          14.691418647766113,
+          -76.15262603759766,
+          0.9699999690055847
+        ],
+        [
+          30.59404945373535,
+          30.15262794494629,
+          16.31999969482422
+        ]
+      ]
+    }
+  },
+  "limitations": [
+    "Only two selected craft shops; upper floors of other unrefined shops remain unchanged.",
+    "Static demonstration geometry: handlooms and pottery wheels do not animate; no kiln or complete manufacturing simulation.",
+    "No new game controller, collision mesh, navmesh or mobile benchmark.",
+    "Byte sharing reduces file storage, not triangle counts; runtime memory/loading depends on the viewer.",
+    "All original V2.4 water, bridges, towers, four shop interiors and tea house remain unchanged."
+  ]
+}

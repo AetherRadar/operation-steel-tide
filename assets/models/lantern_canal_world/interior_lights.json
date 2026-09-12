@@ -1,0 +1,152 @@
+[
+  {
+    "name": "青瓷坊/拉坯间/1",
+    "positionConstructionZUp": [
+      25.6,
+      -64.0,
+      3.8949999666213992
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 115,
+    "range": 8
+  },
+  {
+    "name": "青瓷坊/赏瓷雅室/1",
+    "positionConstructionZUp": [
+      24.9,
+      -63.9,
+      7.694999966621399
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 90,
+    "range": 8
+  },
+  {
+    "name": "青瓷坊/赏瓷雅室/2",
+    "positionConstructionZUp": [
+      19.65,
+      -63.9,
+      7.694999966621399
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 90,
+    "range": 8
+  },
+  {
+    "name": "青瓷坊/瓷坯晾架/1",
+    "positionConstructionZUp": [
+      24.9,
+      -63.9,
+      11.494999966621398
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 90,
+    "range": 8
+  },
+  {
+    "name": "青瓷坊/瓷坯晾架/2",
+    "positionConstructionZUp": [
+      19.65,
+      -63.9,
+      11.494999966621398
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 90,
+    "range": 8
+  },
+  {
+    "name": "彩云绸铺/织造间/1",
+    "positionConstructionZUp": [
+      25.6,
+      24.0,
+      3.8949999666213992
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 115,
+    "range": 8
+  },
+  {
+    "name": "彩云绸铺/裁衣雅室/1",
+    "positionConstructionZUp": [
+      24.9,
+      24.1,
+      7.694999966621399
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 90,
+    "range": 8
+  },
+  {
+    "name": "彩云绸铺/裁衣雅室/2",
+    "positionConstructionZUp": [
+      19.65,
+      24.1,
+      7.694999966621399
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 90,
+    "range": 8
+  },
+  {
+    "name": "彩云绸铺/绸缎库/1",
+    "positionConstructionZUp": [
+      24.9,
+      24.1,
+      11.494999966621398
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 90,
+    "range": 8
+  },
+  {
+    "name": "彩云绸铺/绸缎库/2",
+    "positionConstructionZUp": [
+      19.65,
+      24.1,
+      11.494999966621398
+    ],
+    "color": [
+      1.0,
+      0.73,
+      0.43
+    ],
+    "intensity": 90,
+    "range": 8
+  }
+]

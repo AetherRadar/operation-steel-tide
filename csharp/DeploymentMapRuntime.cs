@@ -76,6 +76,13 @@ public static class DeploymentMapRuntime
             SelectMap(DeploymentMapCatalog.ResidentialSurvivalId);
         }
 
+        if (Array.Exists(args, value =>
+                value is "--validate-lantern-canal"
+                    or "--capture-lantern-canal"))
+        {
+            SelectMap(DeploymentMapCatalog.LanternCanalId);
+        }
+
         return _selectedMapId;
     }
 

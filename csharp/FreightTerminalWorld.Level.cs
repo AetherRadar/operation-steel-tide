@@ -564,6 +564,11 @@ void sky() {
             BuildResidentialSurvivalLevel();
             return;
         }
+        if (IsLanternCanalMap)
+        {
+            BuildLanternCanalLevel();
+            return;
+        }
         if (TryBuildOrbitalComplexRuntimeLevel())
         {
             return;

@@ -22,6 +22,8 @@ public partial class FreightTerminalWorld : Node3D
             ? OrbitalComplexRuntimeExtractionPoint
             : IsSurvivalMode
             ? ResidentialSurvivalExtractionPoint
+            : IsLanternCanalMap
+            ? LanternCanalExtractionPoint
             : FreightTerminalExtractionPoint;
 
     private TacticalPlayer _player = null!;
@@ -914,6 +916,11 @@ public partial class FreightTerminalWorld : Node3D
             DeploymentPoint = JianghaiExtractionSpawnLayout.PlayerPad;
             _assignedHostilePads = new List<Vector3>(JianghaiExtractionSpawnLayout.HostilePads);
         }
+        else if (IsLanternCanalMap)
+        {
+            DeploymentPoint = LanternCanalDeploymentPoint;
+            _assignedHostilePads = new List<Vector3>(LanternCanalHostilePads);
+        }
         else
         {
             // Assign edge pads before the player exists so deploy position is match-randomized.
@@ -1011,6 +1018,11 @@ public partial class FreightTerminalWorld : Node3D
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             SpawnOrbitalComplexRuntimeWeaponCases();
+            return;
+        }
+        if (IsLanternCanalMap)
+        {
+            SpawnLanternCanalWeaponCases();
             return;
         }
         if (IsBlackwaterRefineryMap)
@@ -1205,6 +1217,11 @@ public partial class FreightTerminalWorld : Node3D
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             SpawnOrbitalComplexRuntimeGradedLoot();
+            return;
+        }
+        if (IsLanternCanalMap)
+        {
+            SpawnLanternCanalGradedLoot();
             return;
         }
         if (IsBlackwaterRefineryMap)
@@ -1404,6 +1421,11 @@ public partial class FreightTerminalWorld : Node3D
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             SpawnOrbitalComplexRuntimeEnemies();
+            return;
+        }
+        if (IsLanternCanalMap)
+        {
+            SpawnLanternCanalEnemies();
             return;
         }
         // Map garrison NPCs (TeamId 0) — prefer hunting rival squads, loot when idle.

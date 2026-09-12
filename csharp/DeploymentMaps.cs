@@ -19,6 +19,7 @@ public static class DeploymentMapCatalog
     public const string BlackwaterRefineryId = "blackwater_refinery";
     public const string OrbitalComplexId = "orbital_complex";
     public const string ResidentialSurvivalId = "residential_survival";
+    public const string LanternCanalId = "lantern_canal";
 
     public static readonly IReadOnlyList<DeploymentMapOffer> Maps = new[]
     {
@@ -53,6 +54,14 @@ public static class DeploymentMapCatalog
             "LASTLIGHT COMMUNITY",
             "map_residential_survival_subtitle",
             "RESIDENTIAL SURVIVAL ZONE  //  NORTHSTAR PLAZA",
+            true),
+        new DeploymentMapOffer(
+            LanternCanalId,
+            "MAP 05",
+            "map_lantern_canal",
+            "LANTERN CANAL DISTRICT",
+            "map_lantern_canal_subtitle",
+            "JIANGHAI WORKSHOPS  //  CERAMICS AND SILK",
             true)
     };
 
