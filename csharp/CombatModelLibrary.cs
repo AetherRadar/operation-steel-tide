@@ -764,13 +764,23 @@ internal sealed class AuthoredOperatorVisual
     {
         get
         {
-            if (_leftFootBone < 0 || _rightFootBone < 0 || !GodotObject.IsInstanceValid(Root))
+            if (!GodotObject.IsInstanceValid(Root))
             {
                 return 0.0f;
             }
 
             try
             {
+                var animation = AnimationPlayer.CurrentAnimation.ToString();
+                if (animation is "prone_idle" or "prone_crawl" or "downed" or "death")
+                {
+                    return ComputeLowPoseGroundingOffset();
+                }
+                if (_leftFootBone < 0 || _rightFootBone < 0)
+                {
+                    return 0.0f;
+                }
+
                 var rootInverse = Root.GlobalTransform.AffineInverse();
                 var skeletonTransform = _skeleton.GlobalTransform;
                 var left = rootInverse
@@ -787,6 +797,39 @@ internal sealed class AuthoredOperatorVisual
                 return 0.0f;
             }
         }
+    }
+
+    private float ComputeLowPoseGroundingOffset()
+    {
+        var rootInverse = Root.GlobalTransform.AffineInverse();
+        var skeletonTransform = _skeleton.GlobalTransform;
+        var lowestBone = float.PositiveInfinity;
+        for (var index = 0; index < _skeleton.GetBoneCount(); index++)
+        {
+            // The root bone is the authored character origin, rather than a
+            // contact point. Including it would pin every prone pose to the
+            // root and recreate the visible hover.
+            if (_skeleton.GetBoneParent(index) < 0)
+            {
+                continue;
+            }
+
+            var boneOrigin = (rootInverse
+                * (skeletonTransform * _skeleton.GetBoneGlobalPose(index))).Origin;
+            if (float.IsFinite(boneOrigin.Y))
+            {
+                lowestBone = Mathf.Min(lowestBone, boneOrigin.Y);
+            }
+        }
+
+        if (!float.IsFinite(lowestBone))
+        {
+            return 0.0f;
+        }
+
+        // Bone origins sit just inside the skinned surface. Leave a small
+        // clearance so the body rests on the floor without z-fighting.
+        return Mathf.Clamp(0.03f - lowestBone, -0.85f, 0.25f);
     }
 
     private float ComputeStandingFootClearance()
@@ -1359,10 +1402,13 @@ internal sealed class AuthoredOperatorVisual
     internal void RefreshWeaponPose(string? animationOverride = null)
     {
         var animation = animationOverride ?? AnimationPlayer.CurrentAnimation.ToString();
+        var lowPose = animation is "prone_idle" or "prone_crawl";
         if (!_weaponReadied
             || _weapon is null
             || !GodotObject.IsInstanceValid(_weapon.Root)
-            || (!string.IsNullOrEmpty(animation) && !IsTwoHandedReadyAnimation(animation)))
+            || (!string.IsNullOrEmpty(animation)
+                && !IsTwoHandedReadyAnimation(animation)
+                && !lowPose))
         {
             return;
         }
@@ -1374,6 +1420,19 @@ internal sealed class AuthoredOperatorVisual
         RefreshAuthoredPalmFrames();
         if (CombatModelLibrary.UsesHy3dOperator(VisualId) && _hasAuthoredCarryPose)
         {
+            if (lowPose)
+            {
+                // Prone clips do not contain a rifle-specific hand solve. Keep
+                // the authored rifle frame attached to Spine2 so it follows
+                // the prone torso instead of retaining the last upright world
+                // transform and visibly floating beside the operator.
+                ApplyWeaponSocketTransform(
+                    readied: true,
+                    dynamicCarry: true,
+                    animationOverride: animation);
+                return;
+            }
+
             // The GLB owns the upper-body pose, palm contacts, and rifle root.
             // Reparenting the weapon is the only runtime operation needed.
             ApplyWeaponSocketTransform(

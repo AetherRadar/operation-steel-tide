@@ -33,6 +33,11 @@ into the right-hand bone frame before the locomotion and carry passes. The
 exported `MagpieRightHandPatch` is part of the final skinned character; it is
 not a runtime primitive or pose workaround.
 
+The repair export keeps the armature in pose mode. Blender's glTF exporter
+otherwise samples every action from the bind pose, which turns the prone,
+downed, and death clips into a static standing pose even though their action
+curves are present.
+
 The delivered Viper also carries bone-parented `LeftPalmFrame`,
 `RightPalmFrame`, `LeftWristFrame`, `RightWristFrame`, shoulder frames,
 `ChestClearanceFrame`, and `HeadBaseFrame` landmarks. These are authored in the
@@ -52,7 +57,7 @@ Delivered files (all self-contained GLBs with embedded textures):
 | Viper | `viper.glb` | 21,687,648 bytes | `CD454A45AAD26D359964A14DC9D513CDF7B030DAC550A4F71B7E6F3D63D728B5` |
 | Heron | `heron.glb` | 21,433,124 bytes | `81A190D7C4F54E4D8381E7E647A674799F4BEB06F3ED3A2C4B1283B522C8539F` |
 | Lynx | `lynx.glb` | 22,709,020 bytes | `2F8256A0E424FF7C1BA9C12B121FAF77C7A7E49E939EC55044EE13B4C96A0091` |
-| Magpie | `magpie.glb` | 20,084,204 bytes | `753EB9E41B03269FAF89CA4E2D2B78B973DAF271072A0437ABB0B667F6EC8654` |
+| Magpie | `magpie.glb` | 21,087,872 bytes | `F68A06B413B10F8C81C3AD929CAE46F5052C801CE389C465A060788C63A866E9` |
 | Jackal | `jackal.glb` | 21,915,992 bytes | `088ACE1CCA20E4CF708670B8E551DA213055D93B23935FD012A7E8BC5E7F4173` |
 
 Rebuild one role (Windows):

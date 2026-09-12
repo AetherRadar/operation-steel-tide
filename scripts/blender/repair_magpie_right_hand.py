@@ -136,7 +136,11 @@ def main():
     mesh = max(meshes, key=lambda obj: len(obj.data.polygons), default=None)
     if armature is None or mesh is None:
         raise RuntimeError("input GLB has no armature and visual mesh")
-    armature.data.pose_position = "REST"
+    # Keep the imported armature in pose mode while exporting. Setting
+    # pose_position to REST here makes Blender's glTF exporter sample every
+    # action from the bind pose, which silently turns prone/death clips into
+    # static standing poses. The patch frame below already uses data-bone
+    # rest matrices, so no pose-position override is needed.
     bpy.context.view_layer.update()
     patch, faces, vertices = make_patch(mesh, armature)
     bpy.ops.object.select_all(action="SELECT")

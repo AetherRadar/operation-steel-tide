@@ -48,6 +48,7 @@ public partial class FreightTerminalWorld
 
     private static readonly OperatorVisualId[] OperatorCarryVisuals =
     {
+        OperatorVisualId.Garrison,
         OperatorVisualId.Heron,
         OperatorVisualId.Lynx,
         OperatorVisualId.Magpie,

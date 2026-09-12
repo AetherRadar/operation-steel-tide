@@ -190,7 +190,7 @@ internal sealed class AuthoredOperatorAnimator
         }
         Play(next, playbackSpeed);
         AdvanceAndRefresh(delta);
-        ApplyGroundingCorrection(downed || dead);
+        ApplyGroundingCorrection();
     }
 
     private static string SelectWeaponPose(
@@ -226,7 +226,7 @@ internal sealed class AuthoredOperatorAnimator
         _hitCooldownRemaining = 0.0f;
         Play(weaponReadied ? "ready_idle" : "idle", 1.0f, immediate: true);
         _visual.RefreshWeaponPose(weaponReadied ? "ready_idle" : "idle");
-        ApplyGroundingCorrection(false);
+        ApplyGroundingCorrection();
     }
 
     public bool PlayHit()
@@ -309,17 +309,8 @@ internal sealed class AuthoredOperatorAnimator
         _visual.RefreshWeaponPose(_current);
     }
 
-    private void ApplyGroundingCorrection(bool downed)
+    private void ApplyGroundingCorrection()
     {
-        // Downed/death clips are authored around a standing root.  Lower the
-        // visual to the actor's capsule base so the body rests on the ground
-        // instead of hovering above it.
-        if (downed)
-        {
-            _visual.Root.Position = Vector3.Down * 0.46f;
-            return;
-        }
-
         var position = _visual.Root.Position;
         position.Y = _visual.GroundingOffsetForCurrentPose;
         _visual.Root.Position = position;

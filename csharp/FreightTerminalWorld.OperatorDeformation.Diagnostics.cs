@@ -15,6 +15,7 @@ public partial class FreightTerminalWorld
 {
     private static readonly OperatorVisualId[] OperatorDeformationVisuals =
     {
+        OperatorVisualId.Garrison,
         OperatorVisualId.Heron,
         OperatorVisualId.Lynx,
         OperatorVisualId.Magpie,

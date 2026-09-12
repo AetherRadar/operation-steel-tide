@@ -1251,6 +1251,16 @@ are not relicensed as MIT:
 - Credentials: never store the Tencent SecretId, token, or API key in this
   repository, logs, or generated metadata.
 
+The garrison runtime duplicate is rebuilt from the approved Viper GLB by
+`scripts/blender/build_enemy_operator.py`. It retains the authored
+`RifleCarrySocket`, `LeftPalmFrame`, and `RightPalmFrame` contract so runtime
+carry does not apply a second arm solve to the skinned mesh. The 2026-09-12
+rebuild is `assets/models/enemy_operator/enemy_operator.glb` (21,699,944 bytes,
+SHA-256 `6A991D6D241BB11D2B1FD70E01674D00D203ACD8CEFE488549CDA5A41CDEC919`)
+with editable source `source_art/combat_models/enemy_operator.blend`
+(41,231,946 bytes, SHA-256
+`B7F0C9D43F1D0B04CC23283E56B92E0DC84DB224FDDB2C573079DB5251ABE4FC`).
+
 The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
 
 - Official pack page: https://quaternius.com/packs/ultimategun.html

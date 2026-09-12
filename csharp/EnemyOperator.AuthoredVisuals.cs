@@ -127,6 +127,25 @@ public partial class EnemyOperator
             preferUprightLocomotion: true);
     }
 
+    private void AdvanceDeadAuthoredOperator(float delta)
+    {
+        if (!UsesAuthoredOperatorForDiagnostics)
+        {
+            return;
+        }
+
+        _authoredOperatorAnimator.Update(
+            Mathf.Clamp(delta, 0.0f, 0.1f),
+            0.0f,
+            weaponReadied: false,
+            prone: false,
+            crouched: false,
+            aiming: false,
+            downed: false,
+            reviving: false,
+            dead: true);
+    }
+
     private void AttachAuthoredOperatorVisual()
     {
         if (IsWorldBoss)

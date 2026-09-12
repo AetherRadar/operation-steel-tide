@@ -591,7 +591,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     public override void _PhysicsProcess(double delta)
     {
         ResetPursuitNavigationMotorFrame();
-        if (IsDead || !GodotObject.IsInstanceValid(Player))
+        if (IsDead)
+        {
+            // Death is a terminal gameplay state, but its authored clip still
+            // needs physics-tick sampling so the body reaches the actual
+            // prone-on-ground pose instead of freezing on frame zero.
+            AdvanceDeadAuthoredOperator((float)delta);
+            return;
+        }
+        if (!GodotObject.IsInstanceValid(Player))
         {
             return;
         }
