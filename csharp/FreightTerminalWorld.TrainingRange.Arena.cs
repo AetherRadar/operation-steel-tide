@@ -5,6 +5,8 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private TrainingRangeArenaRuntime? _trainingRangeArena;
+    private bool _trainingRangeDayForced;
+    private DeploymentTimeOfDay _trainingRangePreviousTimeOfDay = DeploymentTimeOfDay.Day;
 
     /// <summary>Returns the lazily-built dedicated range scene.</summary>
     public TrainingRangeArenaRuntime? TrainingRangeArena => _trainingRangeArena;
@@ -53,6 +55,16 @@ public partial class FreightTerminalWorld
             _aircraft.SetPhysicsProcess(false);
         }
         arena.SetActive(true);
+        // The venue is a fixed daylight space: setup previews and live fire must
+        // not inherit a survival/night world state. The mission time-of-day is
+        // restored when the production map comes back.
+        if (!_trainingRangeDayForced)
+        {
+            _trainingRangePreviousTimeOfDay = _deploymentTimeOfDay;
+            _trainingRangeDayForced = true;
+        }
+        _deploymentTimeOfDay = DeploymentTimeOfDay.Day;
+        ApplyTimeOfDay(DeploymentTimeOfDay.Day);
         LocalizeTrainingRangeArenaLabels(arena);
         return arena;
     }
@@ -144,6 +156,12 @@ public partial class FreightTerminalWorld
         {
             _levelRoot.Visible = true;
             _levelRoot.ProcessMode = Node.ProcessModeEnum.Inherit;
+        }
+        if (_trainingRangeDayForced)
+        {
+            _deploymentTimeOfDay = _trainingRangePreviousTimeOfDay;
+            _trainingRangeDayForced = false;
+            ApplyTimeOfDay(_deploymentTimeOfDay);
         }
         if (IsInstanceValid(_player) && IsInstanceValid(_hud))
         {
