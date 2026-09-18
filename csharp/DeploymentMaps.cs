@@ -48,16 +48,8 @@ public static class DeploymentMapCatalog
             "STORM-BARRIER QUARANTINE COMPLEX",
             true),
         new DeploymentMapOffer(
-            ResidentialSurvivalId,
-            "MAP 04",
-            "map_residential_survival",
-            "LASTLIGHT SURVIVAL",
-            "map_residential_survival_subtitle",
-            "WAVE SURVIVAL  //  NORTHSTAR PLAZA",
-            true),
-        new DeploymentMapOffer(
             LanternCanalId,
-            "MAP 05",
+            "MAP 04",
             "map_lantern_canal",
             "LANTERN CANAL DISTRICT",
             "map_lantern_canal_subtitle",

@@ -446,8 +446,6 @@ public static class GameLocalization
         Chinese["map_tidal_prison_subtitle"] = "\u7acb\u4f53\u62d8\u7981\u590d\u5408\u533a  //  \u672a\u89e3\u9501";
         Chinese["map_orbital_complex"] = "\u661f\u6f6e\u56de\u6536\u9635\u5217";
         Chinese["map_orbital_complex_subtitle"] = "\u98ce\u66b4\u575d\u68c0\u75ab\u533a";
-        Chinese["map_residential_survival"] = "\u4f59\u6656\u751f\u6d3b\u7fa4";
-        Chinese["map_residential_survival_subtitle"] = "\u751f\u5b58\u6ce2\u6b21  //  \u5317\u8fb0\u5e7f\u573a";
         Chinese["map_lantern_canal"] = "\u706f\u5f71\u6c34\u5df7";
         Chinese["map_lantern_canal_subtitle"] = "\u6c5f\u6d77\u5de5\u574a  //  \u9752\u74f7\u4e0e\u5f69\u4e91\u7ef8";
         Chinese["survival_wave"] = "\u611f\u67d3\u6f6e {0}\u5df2\u62b5\u8fbe";

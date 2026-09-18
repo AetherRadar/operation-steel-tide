@@ -119,6 +119,17 @@ public static class DeploymentMapRuntime
 
     private static void SelectMap(string mapId)
     {
+        if (string.Equals(
+                mapId,
+                DeploymentMapCatalog.ResidentialSurvivalId,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            // The wave-survival arena is a standalone mode entry, not an
+            // extraction deployment offer, so it bypasses the map catalog.
+            _selectedMapId = DeploymentMapCatalog.ResidentialSurvivalId;
+            return;
+        }
+
         _selectedMapId = DeploymentMapCatalog.TryResolve(mapId, out var map) && map.Available
             ? map.Id
             : DeploymentMapCatalog.FreightTerminalId;

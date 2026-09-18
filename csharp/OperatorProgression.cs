@@ -148,7 +148,7 @@ public static class OperatorReputation
             return 2;
         }
 
-        // The residential survival scenario is the onboarding map.
+        // Maps without a specific gate stay at the onboarding level.
         return 1;
     }
 
