@@ -115,6 +115,14 @@ public static class DeploymentMapRuntime
         _selectedWorldSeed = 0;
     }
 
+    /// <summary>
+    /// Hands the world slot back to the default extraction map. Standalone modes
+    /// such as the wave-survival arena are not extraction offers, so leaving them
+    /// for the operations office must not let them own the next scene reload.
+    /// </summary>
+    public static void ResetToExtractionDefault()
+        => _selectedMapId = DeploymentMapCatalog.FreightTerminalId;
+
     internal static void SelectMapForDiagnostics(string mapId) => SelectMap(mapId);
 
     private static void SelectMap(string mapId)

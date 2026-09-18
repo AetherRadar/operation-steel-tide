@@ -42,10 +42,19 @@ public partial class ZombieNpc : CharacterBody3D
         var toPlayer = player.GlobalPosition - GlobalPosition;
         toPlayer.Y = 0;
         var distance = toPlayer.Length();
+        if (GlobalPosition.Y < -15.0f)
+        {
+            // Fell off the survival arena: count the removal instead of falling forever.
+            IsDead = true;
+            Main.NotifyZombieEliminated(this);
+            QueueFree();
+            return;
+        }
         if (distance > 1.35f)
         {
             var direction = toPlayer.Normalized();
-            Velocity = new Vector3(direction.X, Velocity.Y, direction.Z) * (1.55f + Wave * 0.08f);
+            var speed = 1.55f + Wave * 0.08f;
+            Velocity = new Vector3(direction.X * speed, Velocity.Y, direction.Z * speed);
             if (!IsOnFloor()) Velocity += Vector3.Down * 18.0f * (float)delta;
             MoveAndSlide();
             LookAt(GlobalPosition + direction, Vector3.Up);

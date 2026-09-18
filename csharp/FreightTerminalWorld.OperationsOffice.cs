@@ -185,6 +185,13 @@ public partial class FreightTerminalWorld
     {
         if (_missionEnded || _squadDeployed)
         {
+            if (IsSurvivalMode)
+            {
+                // Leaving the standalone survival arena returns the office to the
+                // default extraction world; otherwise the reload keeps building
+                // the night wave map behind every menu.
+                DeploymentMapRuntime.ResetToExtractionDefault();
+            }
             RestartMission();
             return;
         }
