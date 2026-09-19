@@ -125,6 +125,9 @@ public static class DeploymentMapRuntime
 
     internal static void SelectMapForDiagnostics(string mapId) => SelectMap(mapId);
 
+    /// <summary>The world slot the next scene reload would build; diagnostics only.</summary>
+    internal static string SelectedMapIdForDiagnostics => _selectedMapId;
+
     private static void SelectMap(string mapId)
     {
         if (string.Equals(

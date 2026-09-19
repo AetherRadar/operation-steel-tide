@@ -1624,6 +1624,7 @@ public partial class CombatHUD : CanvasLayer
 
     public void SetMissionPhase(string phase, float remaining, bool online)
     {
+        HideSurvivalPresentation();
         var network = online ? Text("online", "ONLINE") : Text("local", "LOCAL");
         var phaseText = phase == "TRAINING_RANGE"
             ? GameLocalization.Get("training_range", _language, "TRAINING RANGE")

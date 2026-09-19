@@ -311,7 +311,7 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
         UpdateSquad((float)delta);
-        if (IsSurvivalMode)
+        if (IsSurvivalArenaRunning)
         {
             UpdateSurvivalZombies((float)delta);
         }
@@ -373,13 +373,13 @@ public partial class FreightTerminalWorld : Node3D
         }
 
         UpdateInteraction((float)delta);
-        if (!IsSurvivalMode)
+        if (!IsSurvivalArenaRunning)
         {
             UpdateDeploymentProtection();
             UpdateReinforcements((float)delta);
         }
 
-        if (!IsSurvivalMode && _enemies.Count > 0)
+        if (!IsSurvivalArenaRunning && _enemies.Count > 0)
         {
             var highestSuspicion = 0.0f;
             foreach (var enemy in _enemies)
@@ -431,7 +431,7 @@ public partial class FreightTerminalWorld : Node3D
             40,
             reinforcementThreshold + ThreatLevels.ReinforcementThresholdShift(_deploymentThreatLevel));
         _missionOnline = online;
-        if (IsSurvivalMode)
+        if (IsSurvivalArenaRunning)
         {
             _missionPhase = "SURVIVAL";
             _missionRemaining = 0.0f;
@@ -463,7 +463,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
-        if (IsSurvivalMode)
+        if (IsSurvivalArenaRunning)
         {
             _missionPhase = "SURVIVAL";
             _missionRemaining = 0.0f;
@@ -489,7 +489,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
-        if (IsSurvivalMode)
+        if (IsSurvivalArenaRunning)
         {
             _missionPhase = "SURVIVAL";
             _missionOnline = false;
@@ -2129,7 +2129,7 @@ public partial class FreightTerminalWorld : Node3D
         }
         if (ShouldFailLocalPlayerOnSecondDown())
         {
-            if (IsSurvivalMode)
+            if (IsSurvivalArenaRunning)
             {
                 CompleteSurvivalDefeat();
             }
@@ -2143,7 +2143,7 @@ public partial class FreightTerminalWorld : Node3D
         {
             return;
         }
-        if (IsSurvivalMode)
+        if (IsSurvivalArenaRunning)
         {
             CompleteSurvivalDefeat();
             return;

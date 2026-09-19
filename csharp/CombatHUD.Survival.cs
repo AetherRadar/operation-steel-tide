@@ -41,6 +41,16 @@ public partial class CombatHUD
         _survivalStatusLabel.Visible = true;
     }
 
+    /// <summary>Hides the survival wave readout when leaving the survival arena for another mode.</summary>
+    public void HideSurvivalPresentation()
+    {
+        _survivalPresentationConfigured = false;
+        if (IsInstanceValid(_survivalStatusLabel))
+        {
+            _survivalStatusLabel.Visible = false;
+        }
+    }
+
     public void ShowSurvivalResult(bool victory, int wave, int eliminations)
     {
         HideOperationsMenus();

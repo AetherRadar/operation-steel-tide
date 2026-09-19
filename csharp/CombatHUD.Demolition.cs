@@ -223,6 +223,10 @@ public partial class CombatHUD
             RefreshFooterLayout();
         }
         RefreshSquadCommandPresentationVisibility();
+        if (active)
+        {
+            HideSurvivalPresentation();
+        }
         CanvasItem[] legacyTopLabels =
         {
             _objectiveLabel,

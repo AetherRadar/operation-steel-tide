@@ -88,9 +88,27 @@ public partial class FreightTerminalWorld
         }
     }
 
+    /// <summary>
+    /// Hands the runtime world slot back to the default extraction map whenever a
+    /// standalone survival world could otherwise own the next scene reload. The wave
+    /// arena is a mode entry, not an extraction offer, so it must never survive a
+    /// return to the office or the launch of another mode.
+    /// </summary>
+    private void ReleaseSurvivalWorldSlot()
+    {
+        if (IsSurvivalMode)
+        {
+            DeploymentMapRuntime.ResetToExtractionDefault();
+        }
+    }
+
     private void EnterOperationsOffice()
     {
         _squadNetwork?.StopLanRoomBrowsing();
+        // The office is the hub for every mode, so it must never keep the standalone
+        // wave arena as the world slot: otherwise the next scene reload rebuilds the
+        // survival map behind the menus and non-survival modes start inside it.
+        ReleaseSurvivalWorldSlot();
         _operationsOfficeActive = true;
         _openingMusic.SetMenuActive(true);
         _player.UiLocked = true;
@@ -123,6 +141,7 @@ public partial class FreightTerminalWorld
     private void OnOperationsQuickStartRequested()
     {
         _operationsOfficeBackdrop.SetPresentationActive(false);
+        ReleaseSurvivalWorldSlot();
         if (string.Equals(
                 _hud.SelectedDeploymentMapId,
                 DeploymentMapCatalog.BlackwaterRefineryId,
@@ -140,12 +159,17 @@ public partial class FreightTerminalWorld
     private void OnDemolitionModeRequested()
     {
         _operationsOfficeBackdrop.SetPresentationActive(false);
+        // Demolition reuses the current scene root instead of reloading the world, so
+        // the slot is released here as well: a later reload (round restart, range exit)
+        // must not resurrect the standalone wave arena behind the arena.
+        ReleaseSurvivalWorldSlot();
         _squadNetwork.StartLanRoomBrowsing();
         _hud.ShowDemolitionBriefing();
     }
 
     private void OnTrainingRangeRequested()
     {
+        ReleaseSurvivalWorldSlot();
         ActivateBattlefieldFromOperationsOffice();
         BeginTrainingRangeSetup();
     }
@@ -185,13 +209,10 @@ public partial class FreightTerminalWorld
     {
         if (_missionEnded || _squadDeployed)
         {
-            if (IsSurvivalMode)
-            {
-                // Leaving the standalone survival arena returns the office to the
-                // default extraction world; otherwise the reload keeps building
-                // the night wave map behind every menu.
-                DeploymentMapRuntime.ResetToExtractionDefault();
-            }
+            // Leaving the standalone survival arena returns the office to the default
+            // extraction world before the reload; otherwise the rebuilt scene keeps
+            // constructing the night wave map behind every menu.
+            ReleaseSurvivalWorldSlot();
             RestartMission();
             return;
         }

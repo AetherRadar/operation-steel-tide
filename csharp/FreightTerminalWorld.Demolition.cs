@@ -282,6 +282,12 @@ public partial class FreightTerminalWorld
             }
         }
         ClearDemolitionOpponents();
+        // A demolition session can be launched from the operations office while the
+        // scene root still holds the standalone wave arena. The infected chase the
+        // local player anywhere on the map and the survival readout sits in the same
+        // top-left corner as the demolition status, so both are released here.
+        ClearSurvivalZombies();
+        _hud.HideSurvivalPresentation();
     }
 
     private IReadOnlyList<Vector3> DemolitionSpawnsFor(DemolitionTeam side)

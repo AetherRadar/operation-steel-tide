@@ -12,6 +12,16 @@ public partial class FreightTerminalWorld
     private int _survivalEliminations;
     private bool _survivalVictoryShown;
 
+    /// <summary>
+    /// The wave module owns the scene only while no other mode has taken it over.
+    /// Demolition and the training range reuse this same scene root, so a session whose
+    /// world was built from the standalone survival map must stop the wave timer, the
+    /// infected, and the survival readout as soon as another mode starts. Otherwise the
+    /// demolition round controller never ticks and the survival HUD leaks into it.
+    /// </summary>
+    private bool IsSurvivalArenaRunning
+        => IsSurvivalMode && !_demolitionMode && !_trainingRangeActive;
+
     private void InitializeSurvivalZombies()
     {
         if (!IsSurvivalMode) return;
@@ -29,7 +39,7 @@ public partial class FreightTerminalWorld
 
     private void UpdateSurvivalZombies(float delta)
     {
-        if (!IsSurvivalMode || _missionEnded) return;
+        if (!IsSurvivalArenaRunning || _missionEnded) return;
         _survivalZombies.RemoveAll(z => !IsInstanceValid(z) || z.IsDead);
         _survivalWaveTimer -= delta;
         if (_survivalWaveTimer <= 0.0f)
@@ -111,6 +121,29 @@ public partial class FreightTerminalWorld
             AddChild(zombie);
             _survivalZombies.Add(zombie);
         }
+    }
+
+    /// <summary>
+    /// Removes the infected when another mode takes the scene over. They are live
+    /// actors that chase the local player anywhere on the map, so they must not be
+    /// left standing next to a demolition arena or the training range.
+    /// </summary>
+    private void ClearSurvivalZombies()
+    {
+        foreach (var zombie in _survivalZombies)
+        {
+            if (!IsInstanceValid(zombie))
+            {
+                continue;
+            }
+            zombie.Visible = false;
+            zombie.ProcessMode = ProcessModeEnum.Disabled;
+            zombie.SetPhysicsProcess(false);
+            zombie.CollisionLayer = 0;
+            zombie.CollisionMask = 0;
+            zombie.QueueFree();
+        }
+        _survivalZombies.Clear();
     }
 
     internal void NotifyZombieEliminated(ZombieNpc zombie)

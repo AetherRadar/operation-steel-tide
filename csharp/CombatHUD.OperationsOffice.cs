@@ -342,6 +342,7 @@ public partial class CombatHUD
     {
         SetTrainingRangeGameplayInputEnabled(true);
         HideOperationsMenus();
+        HideSurvivalPresentation();
         _squadLobby.Visible = false;
         _gameplayHudRoot.Visible = true;
         KeepTrainingRangeOverlaysHidden();

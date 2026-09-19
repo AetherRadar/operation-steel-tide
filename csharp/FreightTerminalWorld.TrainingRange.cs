@@ -175,20 +175,7 @@ public partial class FreightTerminalWorld
         _hostileSquads.Clear();
         _lootSources.RemoveAll(source => source is EnemyOperator);
         _worldBoss = null;
-        foreach (var zombie in _survivalZombies)
-        {
-            if (!IsInstanceValid(zombie))
-            {
-                continue;
-            }
-            zombie.Visible = false;
-            zombie.ProcessMode = ProcessModeEnum.Disabled;
-            zombie.SetPhysicsProcess(false);
-            zombie.CollisionLayer = 0;
-            zombie.CollisionMask = 0;
-            zombie.QueueFree();
-        }
-        _survivalZombies.Clear();
+        ClearSurvivalZombies();
         if (IsInstanceValid(_aircraft))
         {
             _aircraft!.Visible = false;
