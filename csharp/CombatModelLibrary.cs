@@ -810,7 +810,7 @@ internal sealed class AuthoredOperatorVisual
                 WeaponSocket.Position = authoredWeaponSocket.Position;
             }
         }
-        BackWeaponSocket = CreateBoneAttachment(_skeleton, "RuntimeBackWeaponSocket", "mixamorig:Spine2");
+        BackWeaponSocket = CombatModelLibrary.RequireNode(root, "BackWeaponSocket");
         HeadSocket = CombatModelLibrary.RequireNode(root, "HeadSocket");
         VestSocket = CombatModelLibrary.RequireNode(root, "VestSocket");
         BackpackSocket = CombatModelLibrary.RequireNode(root, "BackpackSocket");

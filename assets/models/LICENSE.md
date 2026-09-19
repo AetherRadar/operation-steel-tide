@@ -1251,6 +1251,14 @@ are not relicensed as MIT:
 - Credentials: never store the Tencent SecretId, token, or API key in this
   repository, logs, or generated metadata.
 
+On 2026-09-19, project contributors manually edited Viper's `preview_stand`
+in Blender 4.5.10 to remove the sideways right-knee bend and backward torso
+lean. This changes the approved output's preview action only; it adds no
+third-party content and does not change its redistribution terms. Source,
+delivery mapping, modification details, and Godot review images are recorded
+in `source_art/hy3d_operators/README.md`; the current GLB hash is recorded in
+`assets/models/hy3d_operators/README.md`.
+
 The garrison runtime duplicate is rebuilt from the approved Viper GLB by
 `scripts/blender/build_enemy_operator.py`. It retains the authored
 `RifleCarrySocket`, `LeftPalmFrame`, and `RightPalmFrame` contract so runtime

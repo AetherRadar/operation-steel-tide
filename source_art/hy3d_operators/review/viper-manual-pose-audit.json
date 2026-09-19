@@ -1,0 +1,334 @@
+{
+  "valid": true,
+  "unchanged_gameplay_actions": 38,
+  "unchanged_meshes": 2,
+  "unchanged_rest_bones": 58,
+  "changed_preview_channels": [
+    [
+      "pose.bones[\"Spine\"].rotation_quaternion",
+      0
+    ],
+    [
+      "pose.bones[\"Spine\"].rotation_quaternion",
+      1
+    ],
+    [
+      "pose.bones[\"Spine\"].rotation_quaternion",
+      2
+    ],
+    [
+      "pose.bones[\"Spine\"].rotation_quaternion",
+      3
+    ],
+    [
+      "pose.bones[\"RightLeg\"].rotation_quaternion",
+      0
+    ],
+    [
+      "pose.bones[\"RightLeg\"].rotation_quaternion",
+      1
+    ],
+    [
+      "pose.bones[\"RightLeg\"].rotation_quaternion",
+      2
+    ],
+    [
+      "pose.bones[\"RightLeg\"].rotation_quaternion",
+      3
+    ]
+  ],
+  "baseline_commit": "e411852cbca88b1057acd37d971fcb2c6be731a1",
+  "baseline_blend_sha256": "17f858c7baeecbf2fbb32dcee47e1ad81fc477bd9059d381f99d6af5e926dd17",
+  "revised_blend_sha256": "b9785f460d324018d87470cc2829e4201bc080360d9b5d2605494942d976017d",
+  "revised_glb_sha256": "997a5fe266ceb4e65b8b979d9c5ae58208a9f0dd4afcf6e7ef69ebd273002ac9",
+  "preview_keyframes": [
+    {
+      "data_path": "pose.bones[\"Spine\"].rotation_quaternion",
+      "array_index": 0,
+      "before": [
+        [
+          [
+            0.0,
+            0.9965912103652954
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            0.9965912103652954
+          ],
+          "CONSTANT"
+        ]
+      ],
+      "after": [
+        [
+          [
+            0.0,
+            0.9941635131835938
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            0.9941635131835938
+          ],
+          "CONSTANT"
+        ]
+      ]
+    },
+    {
+      "data_path": "pose.bones[\"Spine\"].rotation_quaternion",
+      "array_index": 1,
+      "before": [
+        [
+          [
+            0.0,
+            -0.06550206989049911
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            -0.06550206989049911
+          ],
+          "CONSTANT"
+        ]
+      ],
+      "after": [
+        [
+          [
+            0.0,
+            -0.1064867302775383
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            -0.1064867302775383
+          ],
+          "CONSTANT"
+        ]
+      ]
+    },
+    {
+      "data_path": "pose.bones[\"Spine\"].rotation_quaternion",
+      "array_index": 2,
+      "before": [
+        [
+          [
+            0.0,
+            -0.020127076655626297
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            -0.020127076655626297
+          ],
+          "CONSTANT"
+        ]
+      ],
+      "after": [
+        [
+          [
+            0.0,
+            -0.013993680477142334
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            -0.013993680477142334
+          ],
+          "CONSTANT"
+        ]
+      ]
+    },
+    {
+      "data_path": "pose.bones[\"Spine\"].rotation_quaternion",
+      "array_index": 3,
+      "before": [
+        [
+          [
+            0.0,
+            -0.04593804106116295
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            -0.04593804106116295
+          ],
+          "CONSTANT"
+        ]
+      ],
+      "after": [
+        [
+          [
+            0.0,
+            0.010174751281738281
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            0.010174751281738281
+          ],
+          "CONSTANT"
+        ]
+      ]
+    },
+    {
+      "data_path": "pose.bones[\"RightLeg\"].rotation_quaternion",
+      "array_index": 0,
+      "before": [
+        [
+          [
+            0.0,
+            0.9770811200141907
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            0.9770811200141907
+          ],
+          "CONSTANT"
+        ]
+      ],
+      "after": [
+        [
+          [
+            0.0,
+            0.994539201259613
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            0.994539201259613
+          ],
+          "CONSTANT"
+        ]
+      ]
+    },
+    {
+      "data_path": "pose.bones[\"RightLeg\"].rotation_quaternion",
+      "array_index": 1,
+      "before": [
+        [
+          [
+            0.0,
+            -0.14989569783210754
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            -0.14989569783210754
+          ],
+          "CONSTANT"
+        ]
+      ],
+      "after": [
+        [
+          [
+            0.0,
+            -0.04279607534408569
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            -0.04279607534408569
+          ],
+          "CONSTANT"
+        ]
+      ]
+    },
+    {
+      "data_path": "pose.bones[\"RightLeg\"].rotation_quaternion",
+      "array_index": 2,
+      "before": [
+        [
+          [
+            0.0,
+            0.00017772581486497074
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            0.00017772581486497074
+          ],
+          "CONSTANT"
+        ]
+      ],
+      "after": [
+        [
+          [
+            0.0,
+            -0.0008848058641888201
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            -0.0008848058059811592
+          ],
+          "CONSTANT"
+        ]
+      ]
+    },
+    {
+      "data_path": "pose.bones[\"RightLeg\"].rotation_quaternion",
+      "array_index": 3,
+      "before": [
+        [
+          [
+            0.0,
+            0.1511417180299759
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            0.1511417180299759
+          ],
+          "CONSTANT"
+        ]
+      ],
+      "after": [
+        [
+          [
+            0.0,
+            0.09518224745988846
+          ],
+          "CONSTANT"
+        ],
+        [
+          [
+            1.0,
+            0.09518224745988846
+          ],
+          "CONSTANT"
+        ]
+      ]
+    }
+  ]
+}

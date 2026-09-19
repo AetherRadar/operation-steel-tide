@@ -42,8 +42,10 @@ Each delivered operator also carries a 39th Blender-authored `preview_stand`
 action. It places the hips over the planted feet, levels the spine and
 shoulders, and preserves the authored foot contact for the straight-on
 homepage/loadout paper-doll. The runtime selects and pauses this action; it does
-not apply a corrective skeleton transform. The reproducible authoring pass is
-`scripts/blender/author_hy3d_preview_stand.py`.
+not apply a corrective skeleton transform. The original authoring pass was
+`scripts/blender/author_hy3d_preview_stand.py`. Viper now uses the manual
+Blender edit documented in `source_art/hy3d_operators/README.md`; do not
+overwrite its saved pose with that automatic leveling pass.
 
 The delivered Viper also carries bone-parented `LeftPalmFrame`,
 `RightPalmFrame`, `LeftWristFrame`, `RightWristFrame`, shoulder frames,
@@ -61,7 +63,7 @@ Delivered files (all self-contained GLBs with embedded textures):
 
 | Role | File | Size | SHA-256 |
 | --- | --- | ---: | --- |
-| Viper | `viper.glb` | 21,736,428 bytes | `B1CDA6190C36710D2B6BD153E42C2BC550E3A4810486639C054C857C01B2F3BE` |
+| Viper | `viper.glb` | 21,736,824 bytes | `997A5FE266CEB4E65B8B979D9C5AE58208A9F0DD4AFCF6E7EF69EBD273002AC9` |
 | Heron | `heron.glb` | 21,476,084 bytes | `62A7BEEE92A969E4DEB4BF2B0A2EC6954D5A55C3C7C90D95F3316899D05AF351` |
 | Lynx | `lynx.glb` | 22,770,236 bytes | `8E1D71FC4DE2CC63D6B436F0D4228296046349310E952FAE86CB3B370BB03089` |
 | Magpie | `magpie.glb` | 21,134,168 bytes | `02DFF23FF8BB0C900E8680FCA9793B38D236893420BA64B471211443C8160677` |
