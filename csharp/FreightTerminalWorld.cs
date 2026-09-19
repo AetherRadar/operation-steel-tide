@@ -3895,15 +3895,45 @@ public partial class FreightTerminalWorld : Node3D
         var targetMatched = ReferenceEquals(_lootSearchTarget, source);
         var sourceSealedBeforeOpen = !source.IsOpened;
         var openedAt = Time.GetTicksMsec();
-        Input.ActionPress("interact");
-        await WaitFrames(8);
-        var contentsConcealedDuringSearch = !_hud.IsLootVisible && !source.IsOpened;
-        var deadline = Time.GetTicksMsec() + 2500;
-        while (!_hud.IsLootVisible && Time.GetTicksMsec() < deadline)
+        const float searchStepSeconds = 1.0f / 60.0f;
+        var requiredSearchSeconds = source.SearchDuration * _player.RoleSearchDurationMultiplier;
+        var simulatedSearchSeconds = 0.0f;
+        var contentsConcealedDuringSearch = false;
+        var rootWasProcessing = IsProcessing();
+        SetProcess(false);
+        try
         {
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            // Exercise the real hold-to-search updater with a controlled simulation
+            // clock. Cold HUD/model loading can stall a frame for several seconds;
+            // that hardware cost must not masquerade as an early container reveal.
+            _interactionProgress = 0.0f;
+            _interactReleaseRequired = false;
+            Input.ActionPress("interact");
+            var maximumSearchSteps = Mathf.CeilToInt(requiredSearchSeconds / searchStepSeconds) + 2;
+            for (var step = 0; step < maximumSearchSteps && !_hud.IsLootVisible; step++)
+            {
+                UpdateInteraction(searchStepSeconds);
+                simulatedSearchSeconds += searchStepSeconds;
+                if (simulatedSearchSeconds >= requiredSearchSeconds * 0.45f
+                    && simulatedSearchSeconds <= requiredSearchSeconds * 0.55f)
+                {
+                    contentsConcealedDuringSearch = !_hud.IsLootVisible
+                        && !source.IsOpened
+                        && ReferenceEquals(_lootSearchTarget, source)
+                        && _interactionProgress > 0.0f
+                        && _interactionProgress < 1.0f;
+                }
+            }
+        }
+        finally
+        {
+            SetProcess(rootWasProcessing);
         }
         var opened = _hud.IsLootVisible;
+        var searchCompletedAtExpectedDuration = opened
+            && simulatedSearchSeconds >= requiredSearchSeconds - 0.0001f
+            && simulatedSearchSeconds <= requiredSearchSeconds + searchStepSeconds + 0.0001f;
+        // Retain wall time for performance investigation, not functional pass/fail.
         var firstOpenMilliseconds = Time.GetTicksMsec() - openedAt;
         var sourceOpenDeadline = Time.GetTicksMsec() + 2500UL;
         while (!source.OpenVisualReady && Time.GetTicksMsec() < sourceOpenDeadline)
@@ -4168,7 +4198,7 @@ public partial class FreightTerminalWorld : Node3D
         Input.ActionRelease("interact");
         await WaitFrames(3);
         Input.ActionPress("interact");
-        deadline = Time.GetTicksMsec() + 800;
+        var deadline = Time.GetTicksMsec() + 800;
         while (!_hud.IsLootVisible && Time.GetTicksMsec() < deadline)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -4339,8 +4369,7 @@ public partial class FreightTerminalWorld : Node3D
             && lootWallCleared
             && sourceSealedBeforeOpen
             && contentsConcealedDuringSearch
-            && firstOpenMilliseconds >= 650
-            && firstOpenMilliseconds <= 2200
+            && searchCompletedAtExpectedDuration
             && sourceOpenVisualReady
             && sourceClickActivated
             && emptyPrimaryAutoEquipped
@@ -4371,7 +4400,7 @@ public partial class FreightTerminalWorld : Node3D
             && searchDamageAborted
             && fatalSearchStateHandled
             && activeLootEndHandled;
-        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} wall_blocked={lootWallBlocked} wall_cleared={lootWallCleared} sealed_grade={sealedPickupConcealsGrade} sealed_open={sealedPickupOpens} sealed_empty_hidden={sealedPickupEmptyHidden} sealed_return_restored={sealedPickupReturnRestored} tree_loose={treeReconfiguredLoose} tree_sealed={treeReconfiguredSealed} open_empty_retained={openEmptyPickupRetained} empty_retired={emptyPickupRetired} source_sealed={sourceSealedBeforeOpen} search_concealed={contentsConcealedDuringSearch} first_open_ms={firstOpenMilliseconds} source_open_visual={sourceOpenVisualReady} single_click={sourceClickActivated} auto_primary={emptyPrimaryAutoEquipped} auto_secondary={emptySecondaryAutoEquipped} auto_sidearm={emptySidearmAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} fatal_input_primed={fatalInputPrimed} fatal_controls_locked={fatalControlLocked} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
+        GD.Print($"LOOT_CHECK valid={valid} target_matched={targetMatched} open={_hud.IsLootVisible} wall_blocked={lootWallBlocked} wall_cleared={lootWallCleared} sealed_grade={sealedPickupConcealsGrade} sealed_open={sealedPickupOpens} sealed_empty_hidden={sealedPickupEmptyHidden} sealed_return_restored={sealedPickupReturnRestored} tree_loose={treeReconfiguredLoose} tree_sealed={treeReconfiguredSealed} open_empty_retained={openEmptyPickupRetained} empty_retired={emptyPickupRetired} source_sealed={sourceSealedBeforeOpen} search_concealed={contentsConcealedDuringSearch} search_duration_valid={searchCompletedAtExpectedDuration} search_simulated_ms={simulatedSearchSeconds * 1000.0f:0.0} search_expected_ms={requiredSearchSeconds * 1000.0f:0.0} first_open_ms={firstOpenMilliseconds} source_open_visual={sourceOpenVisualReady} single_click={sourceClickActivated} auto_primary={emptyPrimaryAutoEquipped} auto_secondary={emptySecondaryAutoEquipped} auto_sidearm={emptySidearmAutoEquipped} policy={policyValid} weapon_menu={weaponMenuActivated}/{weaponMenuReady}/{weaponMenuEquipped} item_menu={itemMenuActivated}/{itemMenuDropOnly}/{itemMenuDropped} held_blocked={heldInputBlocked} drag_drop={dragDropRouted} returned={returnedToSource} ground_route={groundDropRouted} dropped_registered={droppedRegistered} dropped_visible={droppedVisible} storage_expanded={searchStorageExpanded} source_available={searchSourceAvailable} source_size={searchSourceSize} backpack_size={searchBackpackSize} source_cards={searchSourceCards} storage_fits={searchStorageFits} storage_full={storageAtCapacity} compact_comparisons={compactComparisonsComplete} compact_directions={compactDirectionsVisible} rendered_all={renderedComparisonsComplete} reopened_empty={reopenedEmpty} f_closed={closedByInteract} movement={movementRestored} damage_opened={damageViewOpened} damage_overlay_closed={damageOverlayClosed} damage_unlocked={damageUiUnlocked} damage_mouse={damageMouseCaptured} damage_mouse_observable={damageMouseObservable} damage_applied={damageApplied} damage_closed={damageClosedLoot} damage_movement={damageMovementRestored} search_damage_aborted={searchDamageAborted} search_damage_mouse={searchDamageMouseCaptured} fatal_search_state={fatalSearchStateHandled} fatal_input_primed={fatalInputPrimed} fatal_controls_locked={fatalControlLocked} active_loot_end={activeLootEndHandled} fatal_result={_hud.IsMissionResultVisible} fatal_mouse={fatalMouseVisible} fatal_mouse_observable={fatalMouseObservable} equipped={_player.EquippedWeapon.Platform} source_items={source.Loot.Count} backpack={_player.Backpack.Count} damage={stats.Damage:0.0} range={stats.EffectiveRange:0.0} recoil={stats.Recoil:0.00}");
         GD.Print($"LOOT_PASS valid={valid}");
         GetTree().Quit(valid ? 0 : 2);
     }
