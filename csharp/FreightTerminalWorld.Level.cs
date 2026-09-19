@@ -290,6 +290,11 @@ public partial class FreightTerminalWorld
                 SetIfSupported(_environmentRef, "volumetric_fog_density", 0.0030f);
             }
             ApplyJianghaiOldCityAtmosphere(timeOfDay);
+            if (IsLanternCanalMap)
+            {
+                LanternCanalLighting.Apply(
+                    timeOfDay, _qualitySetting, _environmentRef, _sunLight, _fillLight);
+            }
             if (_nvgActive)
             {
                 ApplyNightVisionOverride();

@@ -16,7 +16,8 @@ public partial class FreightTerminalWorld
     };
 
     private IReadOnlyList<Vector3> ActiveWorldBossPatrolRoute
-        => IsBlackwaterRefineryMap ? RefineryWorldBossPatrolRoute : WorldBossPatrolRoute;
+        => IsLanternCanalMap ? LanternCanalWorldBossPatrolRoute
+            : IsBlackwaterRefineryMap ? RefineryWorldBossPatrolRoute : WorldBossPatrolRoute;
 
     private void SpawnRefineryWeaponCases()
     {

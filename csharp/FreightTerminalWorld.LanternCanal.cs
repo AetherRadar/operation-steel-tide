@@ -10,18 +10,25 @@ public partial class FreightTerminalWorld
         "res://assets/models/lantern_canal_world/lantern_canal_world_v2_5.glb";
     private const string LanternCanalBackdropScenePath =
         "res://assets/models/jianghai_old_city/jianghai_old_city.glb";
-    private static readonly Vector3 LanternCanalDeploymentPoint = new(-68.0f, 0.2f, 92.0f);
-    private static readonly Vector3 LanternCanalExtractionPoint = new(-68.0f, 0.08f, -88.0f);
+    private static readonly Vector3 LanternCanalDeploymentPoint = new(-68.0f, 1.32f, 76.0f);
+    private static readonly Vector3 LanternCanalExtractionPoint = new(-68.0f, 1.12f, -88.0f);
     private static readonly Vector3[] LanternCanalHostilePads =
     {
-        new(68.0f, 0.2f, 92.0f), new(68.0f, 0.2f, -88.0f),
-        new(-68.0f, 0.2f, -20.0f), new(62.0f, 0.2f, 12.0f)
+        new(68.0f, 1.32f, 76.0f), new(68.0f, 1.32f, -88.0f),
+        new(-68.0f, 1.32f, -20.0f), new(68.0f, 1.32f, 12.0f)
     };
-    private static readonly Vector3[] LanternCanalPatrolRoute =
+    private static readonly Vector3[] LanternCanalWorldBossPatrolRoute =
     {
-        new(-48.0f, 0.15f, 76.0f), new(-12.0f, 0.15f, 76.0f),
-        new(42.0f, 0.15f, 42.0f), new(48.0f, 0.15f, -12.0f),
-        new(12.0f, 0.15f, -48.0f), new(-48.0f, 0.15f, -42.0f)
+        new(68.0f, 1.32f, -80.0f), new(68.0f, 1.32f, -96.0f)
+    };
+    private static readonly Vector3[][] LanternCanalPatrolRoutes =
+    {
+        new[] { new Vector3(-42.0f, 1.32f, 76.0f), new Vector3(-42.0f, 1.32f, 62.0f) },
+        new[] { new Vector3(-12.0f, 1.32f, 76.0f), new Vector3(-12.0f, 1.32f, 60.0f) },
+        new[] { new Vector3(42.0f, 1.32f, 42.0f), new Vector3(42.0f, 1.32f, 26.0f) },
+        new[] { new Vector3(42.0f, 1.32f, -12.0f), new Vector3(42.0f, 1.32f, -30.0f) },
+        new[] { new Vector3(12.0f, 1.32f, -48.0f), new Vector3(12.0f, 1.32f, -34.0f) },
+        new[] { new Vector3(-42.0f, 1.32f, -42.0f), new Vector3(-42.0f, 1.32f, -26.0f) }
     };
     private Node3D? _lanternCanalScene;
     private Node3D? _lanternCanalBackdrop;
@@ -39,11 +46,11 @@ public partial class FreightTerminalWorld
         AddChild(_levelRoot);
         _lanternCanalBackdrop = LoadLanternCanalMountainBackdrop();
         _lanternCanalScene = LoadLanternCanalScene(LanternCanalScenePath, "LanternCanalCompleteCity");
-        ConfigureLanternCanalCityPerformance(_lanternCanalScene);
+        LanternCanalLighting.ConfigureCity(_lanternCanalScene);
         BuildLanternCanalCollision();
 
-        BuildObjectiveTerminal("LanternCeramicsRelay", new Vector3(12.8f, 0.0f, 68.0f), -Mathf.Pi * 0.5f, true);
-        BuildObjectiveTerminal("LanternSilkManifest", new Vector3(12.8f, 0.0f, -21.0f), -Mathf.Pi * 0.5f, false);
+        BuildObjectiveTerminal("LanternCeramicsRelay", new Vector3(12.8f, 1.12f, 68.0f), -Mathf.Pi * 0.5f, true);
+        BuildObjectiveTerminal("LanternSilkManifest", new Vector3(12.8f, 1.12f, -21.0f), -Mathf.Pi * 0.5f, false);
         _lanternCanalObjectiveCount = 2;
         var concrete = GroundMaterial("lantern_canal_quay", new Color(0.52f, 0.55f, 0.52f), 0.86f);
         var iron = Mat("lantern_canal_iron", new Color(0.075f, 0.09f, 0.085f), 0.72f, 0.38f);
@@ -102,96 +109,52 @@ public partial class FreightTerminalWorld
         }
     }
 
-    private static void ConfigureLanternCanalCityPerformance(Node3D city)
-    {
-        ConfigureLanternCanalCityNode(city, 0);
-    }
-
-    private static void ConfigureLanternCanalCityNode(Node node, int depth)
-    {
-        if (node is GeometryInstance3D geometry)
-        {
-            // Keep the authored 589 MB GLB intact while avoiding a shadow-map pass
-            // for every static surface. Visibility ranges let Godot cull deep blocks.
-            geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-            geometry.VisibilityRangeEnd = depth <= 2 ? 260.0f : 190.0f;
-        }
-        foreach (var child in node.GetChildren())
-        {
-            if (child is Node childNode)
-            {
-                ConfigureLanternCanalCityNode(childNode, depth + 1);
-            }
-        }
-    }
-
     private void BuildLanternCanalCollision()
     {
-        _lanternCanalCollisionCount = 0;
-        AddLanternCanalCollision("Ground", new Vector3(0.0f, -0.55f, 10.0f), new Vector3(188.0f, 1.0f, 224.0f));
-        AddLanternCanalCollision("WestBoundary", new Vector3(-94.0f, 2.0f, 10.0f), new Vector3(1.0f, 4.4f, 224.0f));
-        AddLanternCanalCollision("EastBoundary", new Vector3(94.0f, 2.0f, 10.0f), new Vector3(1.0f, 4.4f, 224.0f));
-        AddLanternCanalCollision("NorthBoundary", new Vector3(0.0f, 2.0f, -102.0f), new Vector3(188.0f, 4.4f, 1.0f));
-        AddLanternCanalCollision("SouthBoundary", new Vector3(0.0f, 2.0f, 122.0f), new Vector3(188.0f, 4.4f, 1.0f));
-        BuildLanternCanalWorkshopCollision("Ceramics", new Vector3(22.5f, 0.0f, 67.0f));
-        BuildLanternCanalWorkshopCollision("Silk", new Vector3(22.5f, 0.0f, -21.0f));
+        var report = LanternCanalCollisionBuilder.Build(_lanternCanalScene!, _levelRoot);
+        _lanternCanalCollisionCount = report.ShapeCount;
         foreach (var point in new[]
         {
-            new Vector3(12.0f, 0.0f, 59.0f), new Vector3(12.0f, 0.0f, 75.0f),
-            new Vector3(34.0f, 0.0f, 59.0f), new Vector3(34.0f, 0.0f, 75.0f),
-            new Vector3(12.0f, 0.0f, -29.0f), new Vector3(12.0f, 0.0f, -13.0f),
-            new Vector3(34.0f, 0.0f, -29.0f), new Vector3(34.0f, 0.0f, -13.0f),
-            new Vector3(-34.0f, 0.0f, 42.0f), new Vector3(-34.0f, 0.0f, -40.0f)
+            new Vector3(12.0f, 1.32f, 59.0f), new Vector3(12.0f, 1.32f, 75.0f),
+            new Vector3(34.0f, 1.32f, 59.0f), new Vector3(34.0f, 1.32f, 75.0f),
+            new Vector3(12.0f, 1.32f, -29.0f), new Vector3(12.0f, 1.32f, -13.0f),
+            new Vector3(34.0f, 1.32f, -29.0f), new Vector3(34.0f, 1.32f, -13.0f),
+            new Vector3(-34.0f, 1.32f, 42.0f), new Vector3(-34.0f, 1.32f, -40.0f)
         })
         {
             RegisterCoverPoint(point);
         }
         RegisterSquadTraversalLink("lantern_canal_quay_route", SquadTraversalKind.Walk, true,
-            new[] { LanternCanalDeploymentPoint, new Vector3(-42.0f, 0.2f, 36.0f), new Vector3(-42.0f, 0.2f, -38.0f), LanternCanalExtractionPoint });
-    }
-
-    private void BuildLanternCanalWorkshopCollision(string prefix, Vector3 center)
-    {
-        const float width = 15.6f;
-        const float depth = 17.4f;
-        const float height = 12.4f;
-        const float wall = 0.28f;
-        AddLanternCanalCollision(prefix + "EastWall", center + new Vector3(width * 0.5f, height * 0.5f, 0.0f), new Vector3(wall, height, depth));
-        AddLanternCanalCollision(prefix + "BackWall", center + new Vector3(0.0f, height * 0.5f, depth * 0.5f), new Vector3(width, height, wall));
-        AddLanternCanalCollision(prefix + "FrontWall", center + new Vector3(0.0f, height * 0.5f, -depth * 0.5f), new Vector3(width, height, wall));
-        // The west shopfront keeps a broad entry for the FPS capsule and squad rescue route.
-        AddLanternCanalCollision(prefix + "WestWallNorth", center + new Vector3(-width * 0.5f, height * 0.5f, -5.9f), new Vector3(wall, height, 5.6f));
-        AddLanternCanalCollision(prefix + "WestWallSouth", center + new Vector3(-width * 0.5f, height * 0.5f, 5.9f), new Vector3(wall, height, 5.6f));
-        for (var level = 1; level <= 2; level++)
+            new[]
+            {
+                LanternCanalDeploymentPoint, new Vector3(-68.0f, 1.32f, -48.0f),
+                new Vector3(-63.0f, 1.32f, -50.0f), new Vector3(-63.0f, 1.32f, -61.0f),
+                new Vector3(-68.0f, 1.32f, -64.0f), LanternCanalExtractionPoint
+            });
+        foreach (var workshop in new[] { (Name: "ceramics", OffsetZ: 0.0f), (Name: "silk", OffsetZ: -88.0f) })
         {
-            var y = 1.3f + level * 3.8f;
-            AddLanternCanalCollision(prefix + "FloorWest" + level, center + new Vector3(-4.8f, y, 0.0f), new Vector3(5.8f, 0.18f, 16.8f));
-            AddLanternCanalCollision(prefix + "FloorEast" + level, center + new Vector3(4.8f, y, 0.0f), new Vector3(5.8f, 0.18f, 16.8f));
-            AddLanternCanalCollision(prefix + "FloorRear" + level, center + new Vector3(0.0f, y, 5.8f), new Vector3(3.8f, 0.18f, 5.2f));
-            var lower = center + new Vector3(0.0f, 1.35f + (level - 1) * 3.8f, -6.0f);
-            var upper = center + new Vector3(0.0f, 1.35f + level * 3.8f, -0.6f);
-            var slope = -Mathf.Atan2(upper.Y - lower.Y, upper.Z - lower.Z);
-            AddLanternCanalCollision(prefix + "StairRamp" + level, (lower + upper) * 0.5f - Vector3.Up * 0.14f,
-                new Vector3(2.6f, 0.28f, lower.DistanceTo(upper)), new Vector3(slope, 0.0f, 0.0f));
-            RegisterSquadTraversalLink("lantern_canal_" + prefix.ToLowerInvariant() + "_stairs_" + level,
-                SquadTraversalKind.Walk, true, new[] { lower, upper }, costMultiplier: 1.08f);
+            for (var level = 0; level < 2; level++)
+            {
+                var offset = new Vector3(0.0f, level * 3.8f, workshop.OffsetZ);
+                RegisterSquadTraversalLink($"lantern_canal_{workshop.Name}_stairs_{level + 1}",
+                    SquadTraversalKind.Walk, true, new[]
+                    {
+                        offset + new Vector3(22.8f, 1.36f, 71.5f),
+                        offset + new Vector3(26.6f, 3.26f, 71.5f),
+                        offset + new Vector3(26.6f, 3.26f, 73.3f),
+                        offset + new Vector3(22.7f, 5.16f, 73.3f)
+                    }, costMultiplier: 1.08f);
+            }
         }
     }
-
-    private void AddLanternCanalCollision(string name, Vector3 position, Vector3 size, Vector3 rotation = default)
-    {
-        AddInvisibleCollisionBox("LanternCanal" + name, position, size, rotation);
-        _lanternCanalCollisionCount++;
-    }
-
     private void SpawnLanternCanalWeaponCases()
     {
         _lanternCanalLootCount = 0;
         foreach (var definition in new[]
         {
-            (Position: new Vector3(20.0f, 1.35f, 66.0f), Name: "Ceramics workshop response case", Weapon: WeaponCatalog.Build(WeaponPlatform.M4A1, 1)),
-            (Position: new Vector3(20.0f, 1.35f, -21.0f), Name: "Silk workshop guard case", Weapon: WeaponCatalog.Build(WeaponPlatform.MP5A5, 1)),
-            (Position: new Vector3(-60.0f, 0.05f, 84.0f), Name: "South quay starter case", Weapon: WeaponCatalog.Build(WeaponPlatform.GSh18, 0))
+            (Position: new Vector3(20.0f, 1.255f, 66.0f), Name: "Ceramics workshop response case", Weapon: WeaponCatalog.Build(WeaponPlatform.M4A1, 1)),
+            (Position: new Vector3(20.0f, 1.255f, -21.0f), Name: "Silk workshop guard case", Weapon: WeaponCatalog.Build(WeaponPlatform.MP5A5, 1)),
+            (Position: new Vector3(-60.0f, 1.12f, 80.0f), Name: "South quay starter case", Weapon: WeaponCatalog.Build(WeaponPlatform.GSh18, 0))
         })
         {
             var weaponCase = new WeaponCase
@@ -215,12 +178,12 @@ public partial class FreightTerminalWorld
     {
         foreach (var placement in new[]
         {
-            (Position: new Vector3(27.0f, 1.45f, 63.0f), Grade: LootGrade.Rare),
-            (Position: new Vector3(20.0f, 5.35f, 69.0f), Grade: LootGrade.Rare),
-            (Position: new Vector3(27.0f, 9.15f, 69.0f), Grade: LootGrade.Epic),
-            (Position: new Vector3(27.0f, 1.45f, -18.0f), Grade: LootGrade.Uncommon),
-            (Position: new Vector3(20.0f, 5.35f, -19.0f), Grade: LootGrade.Rare),
-            (Position: new Vector3(27.0f, 9.15f, -19.0f), Grade: LootGrade.Epic)
+            (Position: new Vector3(27.0f, 1.255f, 63.0f), Grade: LootGrade.Rare),
+            (Position: new Vector3(20.0f, 5.105f, 69.0f), Grade: LootGrade.Rare),
+            (Position: new Vector3(27.0f, 8.905f, 69.0f), Grade: LootGrade.Epic),
+            (Position: new Vector3(27.0f, 1.255f, -18.0f), Grade: LootGrade.Uncommon),
+            (Position: new Vector3(20.0f, 5.105f, -19.0f), Grade: LootGrade.Rare),
+            (Position: new Vector3(27.0f, 8.905f, -19.0f), Grade: LootGrade.Epic)
         })
         {
             var pickup = new GradedLootPickup { Name = "LanternCanalSupply" + _lanternCanalLootCount, Position = placement.Position };
@@ -235,10 +198,10 @@ public partial class FreightTerminalWorld
 
     private void SpawnLanternCanalEnemies()
     {
-        foreach (var position in LanternCanalPatrolRoute)
+        foreach (var route in LanternCanalPatrolRoutes)
         {
-            var enemy = SpawnEnemy(position, false, teamId: 0);
-            enemy.AssignPatrolRoute(LanternCanalPatrolRoute);
+            var enemy = SpawnEnemy(route[0], false, teamId: 0);
+            enemy.AssignPatrolRoute(route);
         }
         _enemiesRemaining = _enemies.Count;
     }
@@ -253,156 +216,8 @@ public partial class FreightTerminalWorld
             new(new Vector3(22.5f, 0.0f, -21.0f), "lantern_canal_silk", "SILK WORKSHOP", new Color(0.96f, 0.64f, 0.84f)),
             new(new Vector3(-42.0f, 0.0f, 10.0f), "lantern_canal_quay", "WEST QUAY", new Color(0.45f, 0.72f, 1.0f))
         };
-        _hud.ConfigureMinimap(new Rect2(-94.0f, -102.0f, 188.0f, 224.0f), landmarks);
+        _hud.ConfigureMinimap(new Rect2(-80.0f, -192.0f, 160.0f, 278.0f), landmarks);
         _hud.SetMinimapPlayer(_player.GlobalPosition, 0.0f);
     }
 
-    private async void ValidateLanternCanal()
-    {
-        foreach (var enemy in _enemies)
-        {
-            enemy.ProcessMode = ProcessModeEnum.Disabled;
-        }
-        foreach (var mate in _squadMates)
-        {
-            mate.ProcessMode = ProcessModeEnum.Disabled;
-        }
-        await WaitFrames(3);
-        var workshopReady = IsInstanceValid(_lanternCanalScene)
-            && FindLanternCanalNode(_lanternCanalScene, "10_House_E_01") is not null
-            && FindLanternCanalNode(_lanternCanalScene, "10_House_E_05") is not null;
-        var meshCount = CountLanternCanalMeshes(_lanternCanalScene);
-        var lightCount = CountLanternCanalLights(_lanternCanalScene);
-        var visibleMountainCount = CountVisibleLanternCanalMeshes(_lanternCanalBackdrop);
-        using var completeCityFile = FileAccess.Open(LanternCanalScenePath, FileAccess.ModeFlags.Read);
-        var completeCityBytes = completeCityFile?.GetLength() ?? 0;
-        var completeCityReady = completeCityBytes >= 580_000_000;
-        var backdropReady = IsInstanceValid(_lanternCanalBackdrop)
-            && _lanternCanalMountainMeshCount >= 12
-            && visibleMountainCount == _lanternCanalMountainMeshCount;
-        var collisionReady = _lanternCanalCollisionCount >= 30;
-        var gameplayReady = _lanternCanalObjectiveCount == 2 && _lanternCanalLootCount >= 9;
-        var spawnReady = DeploymentPoint == LanternCanalDeploymentPoint
-            && ExtractionPoint == LanternCanalExtractionPoint
-            && DeploymentPoint.DistanceTo(ExtractionPoint) > 140.0f;
-        var valid = workshopReady && completeCityReady && backdropReady && meshCount >= 12 && lightCount >= 10
-            && collisionReady && gameplayReady && spawnReady;
-        GD.Print($"LANTERN_CANAL_CHECK valid={valid} workshop={workshopReady} complete_city={completeCityReady} bytes={completeCityBytes} backdrop_mountains={backdropReady} mountain_meshes={_lanternCanalMountainMeshCount} visible_mountains={visibleMountainCount} meshes={meshCount} lights={lightCount} collision={_lanternCanalCollisionCount} objectives={_lanternCanalObjectiveCount} loot={_lanternCanalLootCount} spawn={spawnReady}");
-        GD.Print($"LANTERN_CANAL_PASS valid={valid}");
-        GetTree().Quit(valid ? 0 : 2);
-    }
-
-    private async void CaptureLanternCanal()
-    {
-        foreach (var enemy in _enemies)
-        {
-            enemy.ProcessMode = ProcessModeEnum.Disabled;
-        }
-        foreach (var mate in _squadMates)
-        {
-            mate.ProcessMode = ProcessModeEnum.Disabled;
-        }
-        _player.ProcessMode = ProcessModeEnum.Disabled;
-        _hud.Visible = false;
-        var camera = new Camera3D { Name = "LanternCanalReviewCamera", Fov = 55.0f, Far = 420.0f };
-        AddChild(camera);
-        camera.GlobalPosition = new Vector3(48.0f, 18.0f, 104.0f);
-        camera.LookAt(new Vector3(22.0f, 5.0f, 67.0f), Vector3.Up);
-        camera.MakeCurrent();
-        await WaitFrames(30);
-        SaveViewportImage("res://lantern_canal_validation.png");
-        camera.GlobalPosition = new Vector3(44.0f, 12.0f, -2.0f);
-        camera.LookAt(new Vector3(22.0f, 5.0f, -21.0f), Vector3.Up);
-        await WaitFrames(24);
-        SaveViewportImage("res://lantern_canal_workshop_validation.png");
-        camera.GlobalPosition = new Vector3(18.0f, 2.25f, 66.0f);
-        camera.LookAt(new Vector3(23.0f, 2.5f, 66.0f), Vector3.Up);
-        await WaitFrames(24);
-        SaveViewportImage("res://lantern_canal_interior_validation.png");
-        GD.Print("LANTERN_CANAL_CAPTURE paths=lantern_canal_validation.png,lantern_canal_workshop_validation.png,lantern_canal_interior_validation.png");
-        GetTree().Quit();
-    }
-
-    private static int CountLanternCanalMeshes(Node? root)
-    {
-        if (root is null || !GodotObject.IsInstanceValid(root))
-        {
-            return 0;
-        }
-        var count = 0;
-        foreach (var child in root.GetChildren())
-        {
-            if (child is MeshInstance3D)
-            {
-                count++;
-            }
-            if (child is Node node)
-            {
-                count += CountLanternCanalMeshes(node);
-            }
-        }
-        return count;
-    }
-
-    private static int CountVisibleLanternCanalMeshes(Node? root)
-    {
-        if (root is null || !GodotObject.IsInstanceValid(root))
-        {
-            return 0;
-        }
-        var count = 0;
-        foreach (var child in root.GetChildren())
-        {
-            if (child is MeshInstance3D mesh && mesh.Visible && mesh.Mesh is not null)
-            {
-                count++;
-            }
-            if (child is Node node)
-            {
-                count += CountVisibleLanternCanalMeshes(node);
-            }
-        }
-        return count;
-    }
-
-    private static int CountLanternCanalLights(Node? root)
-    {
-        if (root is null || !GodotObject.IsInstanceValid(root))
-        {
-            return 0;
-        }
-        var count = 0;
-        foreach (var child in root.GetChildren())
-        {
-            if (child is Light3D)
-            {
-                count++;
-            }
-            if (child is Node node)
-            {
-                count += CountLanternCanalLights(node);
-            }
-        }
-        return count;
-    }
-
-    private static Node? FindLanternCanalNode(Node? root, string requiredName)
-    {
-        if (root is null || !GodotObject.IsInstanceValid(root))
-        {
-            return null;
-        }
-        foreach (var child in root.GetChildren())
-        {
-            if (child.Name.ToString().Equals(requiredName, StringComparison.Ordinal))
-            {
-                return child;
-            }
-            if (child is Node childNode && FindLanternCanalNode(childNode, requiredName) is Node match)
-            {
-                return match;
-            }
-        }
-        return null;
-    }
 }

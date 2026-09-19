@@ -6,6 +6,11 @@ public partial class FreightTerminalWorld
 {
     private void SpawnCivilianValuableLoot()
     {
+        if (IsLanternCanalMap)
+        {
+            // The authored district supplies its own nine quay and workshop loot sources.
+            return;
+        }
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             SpawnOrbitalComplexRuntimeValuables();

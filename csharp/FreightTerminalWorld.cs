@@ -1993,6 +1993,11 @@ public partial class FreightTerminalWorld : Node3D
 
     private void SpawnExplosives()
     {
+        if (IsLanternCanalMap)
+        {
+            // Freight-yard barrel coordinates do not belong to the authored canal city.
+            return;
+        }
         if (IsOrbitalComplexRuntimeMapSelected)
         {
             SpawnOrbitalComplexRuntimeExplosives();
@@ -3176,6 +3181,10 @@ public partial class FreightTerminalWorld : Node3D
         if (_demolitionMode)
         {
             ApplyDemolitionLighting();
+        }
+        else if (IsLanternCanalMap)
+        {
+            ApplyTimeOfDay(_deploymentTimeOfDay);
         }
         if (IsInstanceValid(_operationsOfficeBackdrop))
         {
