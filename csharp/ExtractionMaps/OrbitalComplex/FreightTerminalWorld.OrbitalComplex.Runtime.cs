@@ -1010,12 +1010,15 @@ public partial class FreightTerminalWorld
                 SpawnPad = pad.Position,
                 CallsignPrefix = prefixes[index % prefixes.Length]
             };
+            var squadVisuals = OperatorRosterRules.SelectRivalSquadVisuals(
+                ExtractionEntitySeed(_nextEnemyNetworkId), ExtractionSpawnPads.SquadSize);
             for (var memberIndex = 0; memberIndex < ExtractionSpawnPads.SquadSize; memberIndex++)
             {
                 var member = SpawnEnemy(
                     ExtractionSpawnPads.HostileMemberPosition(pad.Position, memberIndex),
                     alerted: false,
-                    teamId: squad.TeamId);
+                    teamId: squad.TeamId,
+                    operatorVisual: squadVisuals[memberIndex]);
                 member.Name = $"{squad.CallsignPrefix}_{memberIndex + 1}";
                 squad.Members.Add(member);
             }

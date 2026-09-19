@@ -304,6 +304,8 @@ public partial class FreightTerminalWorld
         var spawns = DemolitionSpawnsFor(opponentSide);
         var layout = DemolitionLayout();
         var count = Mathf.Min(DemolitionSquadSize, spawns.Count);
+        var opponentVisuals = OperatorRosterRules.SelectRivalSquadVisuals(
+            ExtractionEntitySeed(_nextEnemyNetworkId), count);
         for (var index = 0; index < count; index++)
         {
             var opponentWeapon = DemolitionOpponentRoundWeaponForSlot(index);
@@ -313,7 +315,8 @@ public partial class FreightTerminalWorld
                 teamId: 0,
                 initialWeapon: opponentWeapon,
                 sentryMode: opponentSide == DemolitionTeam.Defenders,
-                detectionRange: 52.0f);
+                detectionRange: 52.0f,
+                operatorVisual: opponentVisuals[index]);
             opponent.Name = $"DemolitionOpponent_{index + 1:00}";
             opponent.NetworkId = DemolitionActorId(opponentTeam, index);
             if (IsDemolitionNetworkClient)

@@ -6,8 +6,6 @@ namespace OperationSteelTide;
 internal static partial class CombatModelLibrary
 {
     private const string Hy3dOperatorRoot = "res://assets/models/hy3d_operators";
-    private const string EnemyOperatorRoot = "res://assets/models/enemy_operator";
-
     private readonly record struct OperatorVisualAssetSpec(
         string RuntimeScenePath,
         string PreviewScenePath,
@@ -29,11 +27,11 @@ internal static partial class CombatModelLibrary
         if (visualId == OperatorVisualId.Garrison)
         {
             return new OperatorVisualAssetSpec(
-                $"{EnemyOperatorRoot}/enemy_operator.glb",
-                $"{EnemyOperatorRoot}/enemy_operator.glb",
-                Hy3dOperatorNodes,
-                Hy3dOperatorNodes,
-                UsesQuaterniusRig: true);
+                OperatorScenePath,
+                PreviewOperatorScenePath,
+                OperatorNodes,
+                PreviewOperatorNodes,
+                UsesQuaterniusRig: false);
         }
 
         var slug = visualId switch
@@ -58,7 +56,7 @@ internal static partial class CombatModelLibrary
 
     internal static bool UsesHy3dOperator(OperatorVisualId visualId)
     {
-        return true;
+        return visualId != OperatorVisualId.Garrison;
     }
 
 }

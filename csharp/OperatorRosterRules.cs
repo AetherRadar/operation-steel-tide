@@ -42,6 +42,29 @@ public static class OperatorRosterRules
         return OperatorRoles.Spec(roles[StableIndex(seed, roles.Length)]).VisualId;
     }
 
+    /// <summary>Choose distinct operator identities for one hostile team.</summary>
+    public static IReadOnlyList<OperatorVisualId> SelectRivalSquadVisuals(ulong seed, int count)
+    {
+        var roles = OperatorRoles.ExtractionRoles;
+        if (count < 0 || count > roles.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(count));
+        }
+        var candidates = new List<OperatorVisualId>(roles.Length);
+        foreach (var role in roles)
+        {
+            candidates.Add(OperatorRoles.Spec(role).VisualId);
+        }
+        var state = seed == 0 ? 0x9E3779B97F4A7C15UL : seed;
+        for (var index = candidates.Count - 1; index > 0; index--)
+        {
+            state = Mix(state + (ulong)index);
+            var swap = (int)(state % (ulong)(index + 1));
+            (candidates[index], candidates[swap]) = (candidates[swap], candidates[index]);
+        }
+        return candidates.GetRange(0, count);
+    }
+
     private static int StableIndex(ulong seed, int count)
         => (int)(Mix(seed == 0 ? 0xD1B54A32D192ED03UL : seed) % (ulong)count);
 

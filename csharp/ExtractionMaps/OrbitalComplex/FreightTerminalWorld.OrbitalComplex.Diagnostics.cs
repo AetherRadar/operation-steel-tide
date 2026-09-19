@@ -457,7 +457,11 @@ public partial class FreightTerminalWorld
                 .Count(source => source.HasMeta("falltide_loot_id"));
             hostileSquads = _hostileSquads.Count(squad =>
                 squad.Members.Count == ExtractionSpawnPads.SquadSize
-                && squad.Members.All(IsInstanceValid));
+                && squad.Members.All(IsInstanceValid)
+                && squad.Members.Select(member => member.OperatorVisual).Distinct().Count()
+                    == squad.Members.Count
+                && squad.Members.All(member => member.OperatorVisual != OperatorVisualId.Garrison
+                    && member.AuthoredVisualIdForDiagnostics == member.OperatorVisual));
             enemies = _enemies.Count(IsInstanceValid);
             explosives = _barrels.Count(barrel =>
                 IsInstanceValid(barrel) && barrel.HasMeta("falltide_chain_group"));

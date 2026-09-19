@@ -143,7 +143,37 @@ public partial class FreightTerminalWorld
                 .Distinct()
                 .Count() == playerVisuals.Length
             && rivals.All(enemy => playerVisuals.Contains(enemy.OperatorVisual)
-                && enemy.AuthoredVisualIdForDiagnostics == enemy.OperatorVisual);
+                && enemy.AuthoredVisualIdForDiagnostics == enemy.OperatorVisual)
+            && _hostileSquads.Count > 0
+            && _hostileSquads.All(squad => squad.Members.Count == ExtractionSpawnPads.SquadSize
+                && squad.Members.Select(enemy => enemy.OperatorVisual).Distinct().Count()
+                    == squad.Members.Count);
+        var rosterSeeds = Enumerable.Range(0, 64).Select(seed => (ulong)seed)
+            .Append(ulong.MaxValue);
+        var rivalRosterRules = rosterSeeds.All(seed =>
+        {
+            var fullTeam = OperatorRosterRules.SelectRivalSquadVisuals(seed, playerVisuals.Length);
+            return Enumerable.Range(0, playerVisuals.Length + 1).All(count =>
+            {
+                var assigned = OperatorRosterRules.SelectRivalSquadVisuals(seed, count);
+                return assigned.Count == count && assigned.Distinct().Count() == count
+                    && assigned.All(playerVisuals.Contains)
+                    && assigned.SequenceEqual(OperatorRosterRules.SelectRivalSquadVisuals(seed, count))
+                    && assigned.SequenceEqual(fullTeam.Take(count));
+            });
+        });
+        foreach (var invalidCount in new[] { -1, playerVisuals.Length + 1 })
+        {
+            try
+            {
+                OperatorRosterRules.SelectRivalSquadVisuals(0, invalidCount);
+                rivalRosterRules = false;
+            }
+            catch (ArgumentOutOfRangeException exception)
+            {
+                rivalRosterRules &= exception.ParamName == "count";
+            }
+        }
 
         _player.ConfigureRole(OperatorRole.Assault);
         var assaultCapacity = _player.BackpackCapacity;
@@ -190,6 +220,7 @@ public partial class FreightTerminalWorld
             && rosterModelsReady
             && fixedGarrison
             && rivalVariety
+            && rivalRosterRules
             && lootSkillReady
             && locksmithReady
             && uiReady;
@@ -199,6 +230,7 @@ public partial class FreightTerminalWorld
             + $"unique_visuals={playerVisuals.Distinct().Count()} roster_models={rosterModelsReady} "
             + $"visuals={string.Join(';', visualReports)} "
             + $"garrison={garrison.Length} fixed_garrison={fixedGarrison} rivals={rivals.Length} rival_variety={rivalVariety} "
+            + $"rival_roster_rules={rivalRosterRules} "
             + $"scavenger_capacity={scavengerCapacity}/{assaultCapacity} scavenger_search={scavengerSearch:F2} "
             + $"loot_revealed={LastOperatorLootScanForDiagnostics.RevealedCount} loot_value={LastOperatorLootScanForDiagnostics.TotalValue} "
             + $"locksmith_search={locksmithPassive:F2}/{locksmithActive:F2} "

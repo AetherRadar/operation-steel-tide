@@ -542,6 +542,11 @@ public partial class FreightTerminalWorld
             && _hud.IsDemolitionSidearmOfferEnabled(DemolitionBuyCatalog.P226Id);
         var opponentOpeningPistols = _demolitionOpponents.All(opponent =>
             opponent.CarriedWeapon.Platform == WeaponPlatform.P226);
+        var distinctOpponentVisuals = _demolitionOpponents.Count == DemolitionSquadSize
+            && _demolitionOpponents.Select(opponent => opponent.OperatorVisual).Distinct().Count()
+                == _demolitionOpponents.Count
+            && _demolitionOpponents.All(opponent => opponent.OperatorVisual != OperatorVisualId.Garrison
+                && opponent.AuthoredVisualIdForDiagnostics == opponent.OperatorVisual);
         _hud.SelectDemolitionBuySidearmForDiagnostics(DemolitionBuyCatalog.P226Id);
         var openingQuote = _hud.DemolitionBuyQuote;
         _hud.PressDemolitionBuyConfirmForDiagnostics();
@@ -838,7 +843,7 @@ public partial class FreightTerminalWorld
         var matchRules = ValidateDemolitionMatchRules();
         var economyRules = ValidateDemolitionEconomyRules();
         var valid = entryButton && briefingSelection && buyTimerPrecedesRound && deviceAssignedDuringBuy
-            && opponentOpeningPistols
+            && opponentOpeningPistols && distinctOpponentVisuals
             && pistolKit && slotBindings && weaponSlots && isolatedEconomy && deployed && teamStatusReady
             && openingStrategy && sitesClear
             && minimapReady && hostileAircraftIsolated && reinforcementsIsolated
