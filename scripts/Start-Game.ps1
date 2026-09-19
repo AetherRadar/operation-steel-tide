@@ -1,6 +1,12 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {
+}
+
 $forcePreparation = $false
 $forwardedGameArguments = [System.Collections.Generic.List[string]]::new()
 foreach ($argument in [string[]]$args) {
