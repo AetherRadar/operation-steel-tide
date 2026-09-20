@@ -2,6 +2,6 @@
 
 [resource]
 metadata/walk = 0.93075
-metadata/run = 2.945911
-metadata/sprint = 2.945911
-metadata/crouch_walk = 0.651641
+metadata/run = 2.766063
+metadata/sprint = 2.766063
+metadata/crouch_walk = 0.65164

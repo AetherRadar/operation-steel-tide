@@ -117,7 +117,7 @@ def settle_prone_gaze(rig, meshes, presentation_scale):
         ]
         return (max(values) - min(values)) * presentation_scale
 
-    if height() <= 0.69:
+    if height() <= 0.695:
         return 0
     head = rig.pose.bones['Head']
     original = rig.matrix_world @ head.matrix
@@ -134,7 +134,7 @@ def settle_prone_gaze(rig, meshes, presentation_scale):
             if current_height < best_height:
                 best_height = current_height
                 best_direction = direction * degrees
-            if current_height <= 0.70:
+            if current_height <= 0.695:
                 print(f'PRONE_SETTLE_CHECK initial={initial_height:.6f} final={current_height:.6f} '
                       f'head_degrees={direction * degrees} valid=true', flush=True)
                 return direction * degrees

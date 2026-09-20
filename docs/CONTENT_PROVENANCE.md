@@ -426,5 +426,13 @@ acquisition or license. Required attribution is unchanged. Final file sizes
 and SHA-256 values are recorded in `assets/models/hy3d_operators/README.md` and
 `assets/models/LICENSE.md`.
 
+The 2026-09-20 follow-up rebuilds Magpie's complete right forearm and glove
+from its own approved left-arm surface and excludes adjacent thigh-pouch faces.
+It preserves the source materials/UVs and uses Blender-authored weights, not
+runtime replacement geometry. All six final exports retain up to eight skin
+influences and bake complete run/sprint foot contacts in Blender. These edits
+adapt the same approved outputs and existing CC0 actions; creator, acquisition
+date, license restrictions, and required attribution are unchanged.
+
 | Residential Life Cluster | Project-authored in Blender 4.5 from `scripts/blender/build_residential_life_cluster.py`, with disclosed AI assistance. The scene was modeled as a new standalone composition: a four-floor apartment, supermarket hall, three neighborhood storefronts, pedestrian plaza, loading dock, signage, planters, benches, and lighting. | Project-authored geometry, materials, layout, and build code are released under the root MIT license | Editable source: `source_art/world/residential_life_cluster/residential_life_cluster.blend`; runtime: `assets/models/residential_life_cluster/residential_life_cluster.glb`; built 2026-09-09 with Blender 4.5.10; no third-party raw model is embedded |
 | Lantern Canal complete city and refined shops | AetherRadar repository-owner authored `lantern_canal_world_v2_5.glb` from release `v2.5`; the complete city includes the Qingci ceramics and Caiyun silk three-floor refinements. The separate `craft_workshops_v2_5_detail.glb` remains the inspection slice. | Repository-owner permission recorded in `assets/models/lantern_canal_world/LICENSE.md`; upstream does not publish a separate SPDX file. The raw assets are not relicensed by project code. | Complete runtime: `assets/models/lantern_canal_world/lantern_canal_world_v2_5.glb`, 589,056,208 bytes, SHA-256 `ab651fc398e9c77432d9ece3e434220fbff02d87f6dffe24edc5d7d883037cdb`; inspection runtime: `assets/models/lantern_canal_world/lantern_canal_workshops_v2_5.glb`, SHA-256 `c80512850cce17714b3e8ee4ec75e3c2bfda8631776295b26041483bad769d23`; Blender inspection source: `source_art/lantern_canal_world/lantern_canal_workshops_v2_5.blend`; acquired 2026-09-12 |

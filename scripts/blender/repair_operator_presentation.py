@@ -158,6 +158,24 @@ def measure_locomotion(rig, gait):
     return result
 
 
+def settle_prone_actions(rig, meshes, gait, geometry):
+    points = [geometry.world_vertices(mesh) for mesh in meshes]
+    height = max(value[:, 2].max() for value in points) - min(value[:, 2].min() for value in points)
+    scale = 1.86 / height
+    for action in list(bpy.data.actions):
+        if 'prone' not in action.name:
+            continue
+        start, end = action.frame_range
+        intervals = max(1, math.ceil(end - start))
+        frames = [start + (end - start) * index / intervals for index in range(intervals + 1)]
+        samples = []
+        for frame in frames:
+            gait.sample_action(rig, action, frame)
+            gait.settle_prone_gaze(rig, meshes, scale)
+            samples.append(gait.pose_channels(rig))
+        gait.write_action(rig, action.name, frames, samples)
+
+
 def prune_duplicate_actions():
     """Remove obsolete numbered copies left by earlier GLB round trips."""
     names = {action.name for action in bpy.data.actions}
@@ -244,7 +262,7 @@ def export(rig, blend, glb):
             export_def_bones=True, export_leaf_bone=False, export_morph=False,
             export_materials='EXPORT', export_image_format='AUTO',
             export_texcoords=True, export_normals=True, export_tangents=False,
-            export_all_influences=False, export_cameras=False, export_lights=False,
+            export_all_influences=True, export_cameras=False, export_lights=False,
         )
     finally:
         root.parent = None
@@ -266,8 +284,16 @@ def main():
                         help='Author the complete pistol carry family on an existing corrected source')
     parser.add_argument('--author-rifle', action='store_true',
                         help='Author the rifle prone family on an existing corrected source')
+    parser.add_argument('--repair-magpie-debris', action='store_true',
+                        help='Remove Magpie\'s disconnected legacy forearm ribbon before export')
     parser.add_argument('--skip-geometry', action='store_true',
                         help='Skip the Blender geometry gate after an explicitly reviewed asset pass')
+    parser.add_argument('--finalize-contacts', action='store_true',
+                        help='Bake running foot contacts on an existing corrected source')
+    parser.add_argument('--settle-prone', action='store_true',
+                        help='Bake prone silhouette clearance with glTF interpolation margin')
+    parser.add_argument('--stabilize-rifle', action='store_true',
+                        help='Bake moving rifle contacts independently of torso lean')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--finish-only', action='store_true', help='Finish a completed correction without reauthoring its skin or actions')
     mode.add_argument('--repair-prone', action='store_true', help='Update the horizontal prone hold and its weapon contacts')
@@ -302,13 +328,24 @@ def main():
         rig = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
         restore_authoring_space(rig)
         meshes = [o for o in rig.children_recursive if o.type == 'MESH' and o.vertex_groups]
-        if not config.finish_only and not config.repair_prone:
+        if (not config.finish_only and not config.repair_prone) or config.repair_magpie_debris:
             skin.repair_operator_skin(role, rig, meshes)
             meshes = [o for o in rig.children_recursive if o.type == 'MESH' and o.vertex_groups]
+        if role == 'viper':
+            module('repair_viper_contact').refine_viper_collar(
+                rig, skin._read_skin, skin._write_skin, skin._smooth_garments)
+        if role == 'lynx':
+            backpack = bpy.data.objects['LynxAuthoredBackpack']
+            before = len(backpack.data.polygons)
+            backpack.data.validate()
+            print(f'LYNX_BACKPACK_TOPOLOGY_CHECK removed_duplicate_faces='
+                  f'{before - len(backpack.data.polygons)} valid=true', flush=True)
         for mesh in meshes:
             skin.assert_skin_contract(mesh)
         if not config.finish_only and not config.repair_prone:
             gait.repair_locomotion(rig, REPO/'source_art/third_party/quaternius_universal_animation_library/UAL1_Standard.glb')
+            if 'steel_tide_running_contact_revision' in rig:
+                del rig['steel_tide_running_contact_revision']
         if config.repair_prone:
             crawl = bpy.data.actions['prone_crawl']
             gait.sample_action(rig, crawl, sum(crawl.frame_range) * .5)
@@ -328,9 +365,16 @@ def main():
         elif config.author_pistol:
             pistol.author_pistol_pose(rig)
         prune_duplicate_actions()
+        if config.finalize_contacts or not config.finish_only:
+            contacts = module('finalize_operator_contacts')
+            contacts.plant_running_contacts(rig)
+        if config.settle_prone or not config.finish_only:
+            settle_prone_actions(rig, meshes, gait, geometry)
+        if config.stabilize_rifle or not config.finish_only:
+            module('stabilize_operator_rifle').stabilize_rifle_actions(rig)
         preview_channels = merge_preview_audit(config.preview_audit) if role == 'viper' and config.preview_audit else None
         retain_terminal_samples()
-        if not config.finish_only:
+        if not config.finish_only or config.finalize_contacts or config.settle_prone:
             centering.center_actions(rig, gait.sample_action)
             ground_actions(rig, meshes, gait)
         if preview_channels is not None:

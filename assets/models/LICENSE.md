@@ -1259,6 +1259,12 @@ hair faces and texture with a dedicated head-parented chain. Its exposed pack
 reuses the approved Heron backpack surface and material. This is an adaptation
 of the existing approved outputs; no new third-party asset is acquired.
 
+The 2026-09-20 follow-up restores Magpie's missing right forearm/glove using
+the same approved character's left-arm faces, UVs, and materials. It also
+retains eight authored skin influences during export and bakes running foot
+contacts into the existing CC0-derived actions. Local mappings and required
+attribution remain unchanged; no new source asset or license is introduced.
+
 On 2026-09-19, project contributors also manually edited Viper's
 `preview_stand` in Blender 4.5.10 to remove the sideways right-knee bend and
 backward torso lean. This changes the approved output's preview action only; it
@@ -1272,9 +1278,9 @@ source by `scripts/blender/repair_operator_presentation.py -- --roles enemy`.
 It retains the complete authored presentation, action, rifle/handgun socket,
 and palm-frame contract, including `RifleCarrySocket`, `LeftPalmFrame`, and
 `RightPalmFrame` so runtime carry does not apply a second arm solve to the
-skinned mesh. The 2026-09-12
-rebuild is `assets/models/enemy_operator/enemy_operator.glb` (21,699,944 bytes,
-SHA-256 `6A991D6D241BB11D2B1FD70E01674D00D203ACD8CEFE488549CDA5A41CDEC919`)
+skinned mesh. The 2026-09-20
+rebuild is `assets/models/enemy_operator/enemy_operator.glb` (23,182,792 bytes,
+SHA-256 `4AC10D51F887CD722B737D28F3EA300466AE56E7BE6EF90509E76E9EBB22365A`)
 with editable source `source_art/combat_models/enemy_operator.blend`
 (41,231,946 bytes, SHA-256
 `B7F0C9D43F1D0B04CC23283E56B92E0DC84DB224FDDB2C573079DB5251ABE4FC`).

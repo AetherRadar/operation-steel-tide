@@ -315,7 +315,7 @@ def repair_operator_skin(role: str, rig, meshes: Iterable) -> dict:
         for mesh in meshes)
     magpie_upgrade = role == "magpie" and all(
         mesh.get("steel_tide_skin_repair_revision") in (2, 3, REVISION)
-        for mesh in meshes)
+        for mesh in meshes if mesh.name != "MagpieRightHandPatch")
     for mesh in meshes:
         previous = mesh.get("steel_tide_skin_repair_revision")
         if previous is not None and previous != REVISION and not heron_upgrade and not magpie_upgrade:
@@ -324,6 +324,15 @@ def repair_operator_skin(role: str, rig, meshes: Iterable) -> dict:
             if modifier.type == "ARMATURE":
                 modifier.use_deform_preserve_volume = False
     stats = {"role": role, "meshes": 0, "hair_vertices": 0}
+    magpie_contacts = _load_repair("repair_magpie_contacts") if role == "magpie" else None
+    if magpie_contacts is not None:
+        patch = bpy.data.objects.get("MagpieRightHandPatch")
+        body = bpy.data.objects.get("OperatorBody")
+        expected = magpie_contacts.MAGPIE_COMPLETE_HAND_REVISION
+        if (patch is None or patch.get("steel_tide_magpie_complete_hand_revision") != expected
+                or body is None or body.get("steel_tide_magpie_complete_hand_revision") != expected):
+            magpie_contacts.repair_magpie_contacts(rig)
+            meshes = _operator_meshes(rig)
     current = all(mesh.get("steel_tide_skin_repair_revision") == REVISION for mesh in meshes)
     complete_seams = role != "jackal" or all(
         mesh.get("steel_tide_jackal_forearm_seams_revision") == 1 for mesh in meshes)
@@ -354,19 +363,7 @@ def repair_operator_skin(role: str, rig, meshes: Iterable) -> dict:
         helper.refine_heron_skin(rig, meshes)
     if magpie_upgrade:
         for mesh in meshes:
-            if mesh.name != "OperatorBody":
-                continue
-            positions, weights = _read_skin(mesh)
-            weights = _collapse_finger_weights(mesh, weights)
-            protected = np.zeros(len(positions), dtype=bool)
-            hand_groups = [group.index for group in mesh.vertex_groups
-                           if group.name in ("LeftHand", "RightHand", "LeftForeArm", "RightForeArm")]
-            protected = weights[:, hand_groups].sum(axis=1) > 0.8
-            weights = _smooth_garments(mesh, positions, weights, protected, iterations=168)
-            removed = _clear_remote_hand_weights(mesh, positions, weights, allow_hand_only=True)
-            _write_skin(mesh, weights)
-            mesh["steel_tide_removed_remote_hand_vertices"] = removed
-            mesh["steel_tide_audited_fold_edges"] = [[42242, 42247], [35917, 35918]]
+            mesh["steel_tide_skin_repair_revision"] = REVISION
     for mesh in _operator_meshes(rig):
         assert_skin_contract(mesh)
     print("OPERATOR_SKIN_REPAIR_CHECK", " ".join(f"{key}={value}" for key, value in stats.items()))

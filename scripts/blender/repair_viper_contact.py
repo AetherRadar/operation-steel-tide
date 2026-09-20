@@ -186,3 +186,22 @@ def refine_viper_skin(rig, read_skin, write_skin, smooth):
     positions, _weights = read_skin(glove)
     write_skin(glove, _glove_weights(rig, glove, positions))
     body["steel_tide_viper_garment_revision"] = 1
+
+
+def refine_viper_collar(rig, read_skin, write_skin, smooth):
+    """Blend the inspected back-left vest fold without repainting its boundary."""
+    body = bpy.data.objects["OperatorBody"]
+    if body.get("steel_tide_viper_collar_revision") == 1:
+        return
+    positions, weights = read_skin(body)
+    local = np.asarray([tuple(rig.matrix_world.inverted() @ body.matrix_world @ vertex.co)
+                        for vertex in body.data.vertices])
+    region = np.linalg.norm(local - np.asarray((.033, .053, 1.280)), axis=1) < .085
+    if region.sum() < 24:
+        raise RuntimeError("Viper's inspected collar surface is missing")
+    weights = smooth(body, positions, weights, ~region, region=region, iterations=96)
+    write_skin(body, weights)
+    if "steel_tide_audited_fold_edges" in body:
+        del body["steel_tide_audited_fold_edges"]
+    body["steel_tide_viper_collar_revision"] = 1
+    print(f"VIPER_COLLAR_CHECK vertices={int(region.sum())} valid=true", flush=True)

@@ -27,8 +27,33 @@ The corrected scenes retain their editable meshes, UVs, weights, sockets, and
 actions. Viper's fused glove/pouch contact is separated in
 `repair_viper_contact.py`. Magpie's incomplete right arm is rebuilt from its
 own intact left arm in `repair_magpie_contacts.py`. The shared skin pass keeps
-each shoulder's influence family consistent before its final four-weight
-export, so pruning cannot reintroduce sharp weight changes across a seam.
+each shoulder's influence family consistent; the export preserves the authored
+weights rather than pruning them into sharp changes across a seam.
+
+Magpie's right forearm and glove retain the mirrored source UVs and authored
+left-arm influence family. The selection follows the rest skeleton and complete
+hand components, excluding the adjacent thigh pouch. The shoulder paint pass
+limits adjacent weight jumps before export. It does not repaint
+the intact sleeve as a forearm, and rerunning it leaves the source weights intact.
+The presentation diagnostic samples actual forearm surface coverage on both
+sides so a valid skeleton/socket cannot hide a missing limb.
+
+The final glTF export retains all eight authored influences per vertex. Trimming
+them to four creates discontinuities at torso/arm transitions even when the
+Blender skin is continuous. No imported edge is exempted from the tear check.
+Blender validates triangulated edges, including export-created diagonals.
+
+`finalize_operator_contacts.py` uses a two-bone solve to bake complete low-foot
+stance intervals into the run/sprint actions and their weapon variants. Both
+feet use one measured backwards speed, with eased transitions into swing and a
+closed loop. Godot only adjusts clip playback to actual actor travel.
+`stabilize_operator_rifle.py` bakes the reference rifle/wrist frame over moving
+torsos and constrains both arm reach and right-elbow bend. It leaves the
+already-authored leg channels intact. Apply it with `--finish-only
+--stabilize-rifle`; no runtime arm or muzzle correction is required.
+`--finish-only --finalize-contacts` applies this pass to an existing corrected
+source. `--finish-only --settle-prone` adds a 5 mm authoring margin below the
+0.70 m prone silhouette limit; it does not relax the imported geometry gate.
 
 ## Regression checks
 
@@ -41,6 +66,7 @@ dotnet build OperationSteelTide.csproj
 & '<Godot console executable>' --headless --path . -- --validate-operator-carry
 & '<Godot console executable>' --headless --path . -- --validate-operator-roster
 & '<Godot console executable>' --headless --path . -- --validate-squad
+& '<Godot console executable>' --headless --path . scenes/diagnostics/operator_locomotion.tscn -- --validate-operator-locomotion --operator-role=all
 ```
 
 `operator-presentation` runs an isolated diagnostic scene instead of constructing

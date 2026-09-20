@@ -38,19 +38,14 @@ def validate_operator_geometry(rig, meshes, sample_action):
     surfaces = []
     for mesh in meshes:
         points = world_vertices(mesh)
-        indices = np.empty(len(mesh.data.edges) * 2, dtype=np.int32)
-        mesh.data.edges.foreach_get('vertices', indices)
-        edges = indices.reshape((-1, 2))
+        mesh.data.calc_loop_triangles()
+        edges = np.asarray(sorted({tuple(sorted((triangle.vertices[index], triangle.vertices[(index + 1) % 3])))
+                                   for triangle in mesh.data.loop_triangles for index in range(3)}))
         lengths = np.linalg.norm(points[edges[:, 0]] - points[edges[:, 1]], axis=1)
         # HY-3D carries many authored UV/fabric fold edges below 2 cm. They
         # are not exposed surface spans; validate the larger connected spans
         # where a skin tear is visually meaningful.
         short = (lengths >= 0.020) & (lengths < 0.035)
-        audited = {tuple(sorted(pair)) for pair in mesh.get('steel_tide_audited_fold_edges', [])}
-        if audited:
-            short &= np.array([tuple(sorted(pair)) not in audited for pair in edges])
-            print(f'OPERATOR_GEOMETRY_FOLD_CHECK mesh={mesh.name} excluded={len(audited)} valid=true',
-                  flush=True)
         surfaces.append((mesh, edges[short], lengths[short]))
     if not surfaces:
         raise RuntimeError(f'{rig.name}: no authored skinned geometry')

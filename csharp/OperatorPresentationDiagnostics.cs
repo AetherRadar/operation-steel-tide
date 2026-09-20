@@ -56,10 +56,12 @@ public partial class OperatorPresentationDiagnostics : Node3D
                 AddChild(visual.Root);
                 visual.SetWeaponReadied(true);
                 var animator = CheckMovingActions(id, visual, failures);
-                var surfaces = ReadSurfaces(visual.Root, id,
+                var surfaces = ReadSurfaces(visual.Root,
                     arguments.Contains("--dump-operator-bind"));
                 if (surfaces.Count == 0)
                     throw new InvalidOperationException($"{id}: no skinned body surfaces.");
+                if (id == OperatorVisualId.Magpie)
+                    CheckMagpieArmCoverage(surfaces, failures);
                 var poses = visual.AnimationPlayer.GetAnimationList()
                     .Where(name => name != "RESET").ToArray();
                 if (poses.Length != animator.AnimationCount + 1)
@@ -215,7 +217,7 @@ public partial class OperatorPresentationDiagnostics : Node3D
             AddChild(visual.Root);
             visual.SetWeaponReadied(true);
             var animator = CheckMovingActions(id, visual, failures);
-            var surfaces = ReadSurfaces(visual.Root, id);
+            var surfaces = ReadSurfaces(visual.Root);
             foreach (var (speed, aiming, prone) in new[]
             {
                 (0f, false, false), (0f, true, false), (1.3f, false, false),
@@ -290,7 +292,7 @@ public partial class OperatorPresentationDiagnostics : Node3D
             foreach (var nested in Descendants<T>(child)) yield return nested;
     }
 
-    private static List<Surface> ReadSurfaces(Node root, OperatorVisualId visualId, bool dumpBind = false)
+    private static List<Surface> ReadSurfaces(Node root, bool dumpBind = false)
     {
         var result = new List<Surface>();
         foreach (var mesh in Descendants<MeshInstance3D>(root))
@@ -317,19 +319,22 @@ public partial class OperatorPresentationDiagnostics : Node3D
                         pairs.Add(a < b ? (a, b) : (b, a));
                     }
                 }
-                var audited = visualId == OperatorVisualId.Magpie
-                    ? new HashSet<(int, int)> { (35917, 35918), (42242, 42247) }
-                    : new HashSet<(int, int)>();
-                var edges = pairs.Where(pair => !audited.Contains(pair)).Select(pair => new Edge(pair.Item1, pair.Item2,
+                var edges = pairs.Select(pair => new Edge(pair.Item1, pair.Item2,
                     (mesh.GlobalTransform * vertices[pair.Item1]).DistanceTo(mesh.GlobalTransform * vertices[pair.Item2]))).ToArray();
                 var surface = new Surface(mesh, skeleton, skin, vertices, joints, weights,
                     joints.Length / vertices.Length, edges);
+                var bindName = skin.GetBindName(0);
+                var bindBone = string.IsNullOrEmpty(bindName.ToString())
+                    ? skin.GetBindBone(0) : skeleton.FindBone(bindName);
+                var bindShape = skeleton.GetBoneGlobalRest(bindBone) * skin.GetBindPose(0);
                 var rest = DeformedVertices(surface, useRest: true);
+                surface = surface with { Edges = edges.Select(edge => edge with
+                    { RestLength = rest[edge.A].DistanceTo(rest[edge.B]) }).ToArray() };
                 var maxError = 0.0f;
                 var worstVertex = -1;
                 for (var vertex = 0; vertex < rest.Length; vertex++)
                 {
-                    var error = rest[vertex].DistanceTo(mesh.GlobalTransform * vertices[vertex]);
+                    var error = rest[vertex].DistanceTo(mesh.GlobalTransform * bindShape * vertices[vertex]);
                     if (error > maxError)
                     {
                         maxError = error;
@@ -351,10 +356,10 @@ public partial class OperatorPresentationDiagnostics : Node3D
                             var weight = weights[slot];
                             if (weight <= 0) continue;
                             var bind = joints[slot];
-                            var bindName = skin.GetBindName(bind);
-                            var bone = string.IsNullOrEmpty(bindName.ToString())
-                                ? skin.GetBindBone(bind) : skeleton.FindBone(bindName);
-                            GD.Print($"OPERATOR_BIND_DUMP_INFLUENCE slot={bind} weight={weight:F8} name={bindName} bone={bone} "
+                            var influenceName = skin.GetBindName(bind);
+                            var bone = string.IsNullOrEmpty(influenceName.ToString())
+                                ? skin.GetBindBone(bind) : skeleton.FindBone(influenceName);
+                            GD.Print($"OPERATOR_BIND_DUMP_INFLUENCE slot={bind} weight={weight:F8} name={influenceName} bone={bone} "
                                 + $"direct_bone_name={(bind >= 0 && bind < skeleton.GetBoneCount() ? skeleton.GetBoneName(bind) : "<out-of-range>")} "
                                 + $"rest={skeleton.GetBoneGlobalRest(bone)} bind_pose={skin.GetBindPose(bind)} "
                                 + $"rest_bind={skeleton.GetBoneGlobalRest(bone) * skin.GetBindPose(bind)}");
@@ -378,8 +383,9 @@ public partial class OperatorPresentationDiagnostics : Node3D
             var bone = string.IsNullOrEmpty(name.ToString())
                 ? surface.Skin.GetBindBone(bind) : surface.Skeleton.FindBone(name);
             if (bone < 0) throw new InvalidOperationException($"Missing skin joint {name}.");
-            transforms[bind] = surface.Skeleton.GlobalTransform
-                * (useRest ? surface.Skeleton.GetBoneGlobalRest(bone) : surface.Skeleton.GetBoneGlobalPose(bone))
+            // Skeleton3D uploads bone_global_pose * inverse_bind to the renderer.
+            // The mesh instance supplies the sole world transform after skinning.
+            transforms[bind] = (useRest ? surface.Skeleton.GetBoneGlobalRest(bone) : surface.Skeleton.GetBoneGlobalPose(bone))
                 * surface.Skin.GetBindPose(bind);
         }
         var result = new Vector3[surface.Vertices.Length];
