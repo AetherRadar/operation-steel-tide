@@ -50,6 +50,13 @@ public partial class FreightTerminalWorld
         _lanternCanalScene = LoadLanternCanalScene(LanternCanalScenePath, "LanternCanalCompleteCity");
         LanternCanalLighting.ConfigureCity(_lanternCanalScene);
         BuildLanternCanalCollision();
+        foreach (var route in LanternCanalAccess.Build(_levelRoot))
+        {
+            _roofAccessRoutes.Add(new RoofAccessRoute(route.Id, "Canal quay", route.Bottom,
+                route.Top, route.Outward, VerticalAccessKind.Ladder));
+            RegisterSquadTraversalLink(route.Id, SquadTraversalKind.Ladder, true,
+                new[] { route.Bottom, route.Top }, actionOutward: route.Outward);
+        }
 
         BuildObjectiveTerminal("LanternCeramicsRelay", new Vector3(12.8f, 1.12f, 68.0f), -Mathf.Pi * 0.5f, true);
         BuildObjectiveTerminal("LanternSilkManifest", new Vector3(12.8f, 1.12f, -21.0f), -Mathf.Pi * 0.5f, false);

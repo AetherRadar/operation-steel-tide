@@ -1500,3 +1500,17 @@ to add prone/downed integration, recovery poses, and attachment sockets.
 - Runtime mapping: `residential_life_cluster/residential_life_cluster.glb`
 - License: project-authored composition under the root MIT license
 - Acquisition/build date: 2026-09-09
+
+## Canal Egress Ladders
+
+- Creator: MP, Poly Haven; Blender placement/editing by Operation Steel Tide contributors.
+- Source: https://polyhaven.com/a/ladder_sectioned_01
+- Exact license: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
+- License policy: https://polyhaven.com/license
+- Acquired: 2026-09-20; adapted and exported in Blender 4.5 on 2026-09-21.
+- Required attribution: none; voluntary credit: Ladder Sectioned 01 by MP / Poly Haven.
+- Original glTF, binary and 1K textures: `../../source_art/third_party/polyhaven_canal_ladder/`.
+- License evidence: `../../source_art/third_party/polyhaven_canal_ladder/LICENSE_EVIDENCE.html`.
+- Editable source: `../../source_art/lantern_canal_world/canal_access.blend`.
+- Runtime: `lantern_canal_world/canal_access.glb`; 36 placements share one authored ladder mesh and its embedded textures.
+- Build: `../../scripts/blender/build_canal_access.py`. The first ladder section is fitted to the banks; traversal endpoints are authored against the quay and uneven riverbed.

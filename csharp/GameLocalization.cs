@@ -130,6 +130,8 @@ public static class GameLocalization
 
     static GameLocalization()
     {
+        Chinese["climb_ashore"] = "\u722c\u4e0a\u6cb3\u5cb8";
+        Chinese["Canal quay"] = "\u6cb3\u5cb8\u68af\u5b50";
         Chinese["equipment_unequip"] = "\u5378\u4e0b\u88c5\u5907";
         Chinese["equipment_capacity_short"] = "\u5bb9\u91cf";
         Chinese["equipment_protection_short"] = "\u51cf\u4f24";

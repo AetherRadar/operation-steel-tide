@@ -319,9 +319,9 @@ public partial class FreightTerminalWorld
         var action = IsOrbitalComplexRuntimeMapSelected
             ? OrbitalComplexAccessInteractionLabel(nearest, startAtTop)
             : $"{GameLocalization.Get(
-                    startAtTop ? "climb_down" : "climb_up",
+                    startAtTop ? "climb_down" : nearest.Id.StartsWith("CanalAccess_", StringComparison.Ordinal) ? "climb_ashore" : "climb_up",
                     _languageSetting,
-                    startAtTop ? "CLIMB DOWN" : "CLIMB TO ROOF")}  //  {nearest.Building}";
+                    startAtTop ? "CLIMB DOWN" : nearest.Id.StartsWith("CanalAccess_", StringComparison.Ordinal) ? "CLIMB ASHORE" : "CLIMB TO ROOF")}  //  {GameLocalization.Get(nearest.Building, _languageSetting, nearest.Building)}";
         _hud.SetInteraction(action, -1.0f, true);
         if (!_interactReleaseRequired && Input.IsActionJustPressed(GameInputActions.Interact))
         {

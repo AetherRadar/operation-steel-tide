@@ -1,5 +1,23 @@
 # Content Provenance
 
+## Canal Egress Ladders (2026-09-21)
+
+MP's **Ladder Sectioned 01**, acquired 2026-09-20 from
+https://polyhaven.com/a/ladder_sectioned_01, is CC0 1.0 Universal
+(https://creativecommons.org/publicdomain/zero/1.0/). Redistribution and Blender
+derivatives are permitted; attribution is not required. Voluntary credit:
+Ladder Sectioned 01 by MP / Poly Haven. Policy evidence is retained as
+`source_art/third_party/polyhaven_canal_ladder/LICENSE_EVIDENCE.html` from
+https://polyhaven.com/license. Original glTF, binary and 1K textures remain in
+that directory, downloaded against Poly Haven's API file checksums.
+
+`scripts/blender/build_canal_access.py` places and fits the first authored ladder
+section on 36 canal banks and records collision-tested foot endpoints in Blender.
+Editable derivative: `source_art/lantern_canal_world/canal_access.blend`.
+Runtime derivative: `assets/models/lantern_canal_world/canal_access.glb`.
+Godot review: `logs/canal_ladder_water.png`, `logs/canal_ladder_ashore.png`,
+and `--validate-canal-access`. No procedural visible ladder replaces the asset.
+
 This document records the known origin and licensing status of content shipped in or displayed by Operation Steel Tide. It is an audit aid, not a representation that the project satisfies every community's AI-content policy.
 
 ## Development disclosure
