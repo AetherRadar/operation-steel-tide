@@ -87,3 +87,11 @@ __pycache__/
 /assets/models/lantern_canal_world/lantern_canal_world_v2_5_*.jpeg
 /assets/models/lantern_canal_world/lantern_canal_world_v2_5_*.png
 /assets/models/lantern_canal_world/lantern_canal_world_v2_5_*.webp
+
+# Embedded images extracted by Godot from the optimized, self-contained scenes.
+/assets/models/lantern_canal_world/lantern_canal_runtime_*.jpg
+/assets/models/lantern_canal_world/lantern_canal_runtime_*.png
+/assets/models/lantern_canal_world/lantern_mountains_*.jpg
+/assets/models/lantern_canal_world/lantern_mountains_*.png
+/assets/models/enemy_operator/enemy_operator_Garrison*Paint.png
+/assets/models/enemy_operator/enemy_operator_texture_20250901_1.png

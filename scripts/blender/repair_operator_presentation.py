@@ -294,6 +294,8 @@ def main():
                         help='Bake prone silhouette clearance with glTF interpolation margin')
     parser.add_argument('--stabilize-rifle', action='store_true',
                         help='Bake moving rifle contacts independently of torso lean')
+    parser.add_argument('--refine-combat', action='store_true',
+                        help='Author upright running support and closed shot recoil')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--finish-only', action='store_true', help='Finish a completed correction without reauthoring its skin or actions')
     mode.add_argument('--repair-prone', action='store_true', help='Update the horizontal prone hold and its weapon contacts')
@@ -306,17 +308,7 @@ def main():
     centering = module('center_operator_actions')
     for role in config.roles:
         if role == 'enemy':
-            bpy.ops.wm.open_mainfile(filepath=str(REPO/'source_art/hy3d_operators/viper.blend'))
-            rig = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
-            if hierarchy_root(rig).name != PRESENTATION_ROOT:
-                raise RuntimeError('Enemy export requires the completed authored Viper presentation')
-            meshes = [o for o in rig.children_recursive if o.type == 'MESH' and o.vertex_groups]
-            geometry.validate_operator_geometry(rig, meshes, gait.sample_action)
-            gait.sample_action(rig, bpy.data.actions['preview_stand'], 0)
-            export(rig, REPO/'source_art/combat_models/enemy_operator.blend',
-                   REPO/'assets/models/enemy_operator/enemy_operator.glb')
-            source_calibration = REPO/'assets/models/hy3d_operators/viper.locomotion.tres'
-            (REPO/'assets/models/enemy_operator/enemy_operator.locomotion.tres').write_bytes(source_calibration.read_bytes())
+            module('build_distinct_garrison').main()
             print('OPERATOR_PRESENTATION_PASS role=enemy valid=true', flush=True)
             continue
         blend = REPO/f'source_art/hy3d_operators/{role}.blend'
@@ -372,6 +364,10 @@ def main():
             settle_prone_actions(rig, meshes, gait, geometry)
         if config.stabilize_rifle or not config.finish_only:
             module('stabilize_operator_rifle').stabilize_rifle_actions(rig)
+        if config.refine_combat:
+            combat = module('refine_operator_combat')
+            combat.refine_running(rig)
+            combat.author_closed_recoil(rig)
         preview_channels = merge_preview_audit(config.preview_audit) if role == 'viper' and config.preview_audit else None
         retain_terminal_samples()
         if not config.finish_only or config.finalize_contacts or config.settle_prone:

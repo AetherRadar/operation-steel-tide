@@ -57,6 +57,20 @@ source. `--finish-only --settle-prone` adds a 5 mm authoring margin below the
 
 ## Regression checks
 
+The 2026-09-20 posture pass (`--finish-only --refine-combat`) raises running
+hip support to approximately 97% of standing height and narrows the forward
+stride envelope while retaining the planted-foot timing. `refine_operator_combat.py`
+bakes the same corrected lower-body channels into all weapon families.
+Rifle and pistol shots start and end at their authored aiming pose, with a
+14 mm rearward recoil instead of the old raised-arm action. Shots always use
+the upper-body action player so stationary fire cannot reset the actor's feet.
+The imported diagnostic measures hip height, wrist excursion, closed recoil
+endpoints, repeated-shot restart, and the garrison's independent helmet node.
+
+The garrison is built with `build_distinct_garrison.py`, not a Viper copy.
+Its painted olive uniform and fitted helmet designs are retained under
+`source_art/chinese_garrison/` and combined with the repaired Heron skin/rig.
+
 ```powershell
 dotnet build OperationSteelTide.csproj
 & '<Godot console executable>' --headless --path . -- --validate-operator-presentation

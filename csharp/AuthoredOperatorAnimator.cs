@@ -214,8 +214,7 @@ internal sealed class AuthoredOperatorAnimator
         {
             return true;
         }
-        if (name == "reload" || name == "shoot"
-            && (IsLocomotion(_current) || _current.Contains("crouch_", StringComparison.Ordinal)))
+        if (name is "reload" or "shoot")
         {
             _upperBodyAction.Play(
                 name,

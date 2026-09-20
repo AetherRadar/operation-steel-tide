@@ -27,7 +27,7 @@ public partial class OperatorPresentationDiagnostics : Node3D
     {
         "idle", "walk", "run", "sprint", "ready_idle", "ready_walk", "ready_run",
         "aim_idle", "aim_walk", "aim_run", "prone_idle", "prone_crawl",
-        "rifle_prone_idle", "rifle_prone_crawl", "downed", "death", "preview_stand"
+        "rifle_prone_idle", "rifle_prone_crawl", "downed", "death", "preview_stand", "shoot"
     };
 
     public override async void _Ready()
@@ -55,6 +55,7 @@ public partial class OperatorPresentationDiagnostics : Node3D
                     WeaponCatalog.Build(WeaponPlatform.M4A1, 0));
                 AddChild(visual.Root);
                 visual.SetWeaponReadied(true);
+                CheckCombatPosture(id, visual, failures);
                 var animator = CheckMovingActions(id, visual, failures);
                 var surfaces = ReadSurfaces(visual.Root,
                     arguments.Contains("--dump-operator-bind"));
@@ -70,7 +71,8 @@ public partial class OperatorPresentationDiagnostics : Node3D
                 {
                     var holding = pose.StartsWith("ready_", StringComparison.Ordinal)
                         || pose.StartsWith("aim_", StringComparison.Ordinal)
-                        || pose.StartsWith("rifle_", StringComparison.Ordinal);
+                        || pose.StartsWith("rifle_", StringComparison.Ordinal)
+                        || pose == "shoot";
                     visual.SetWeaponReadied(holding);
                     visual.SetWeaponVisible(holding);
                     var animation = visual.AnimationPlayer.GetAnimation(pose)
@@ -180,11 +182,12 @@ public partial class OperatorPresentationDiagnostics : Node3D
         animator.SetRestingPose(true);
         animator.PlayAction("shoot", 0.22f);
         animator.Update(0.1f, 0f, true, false, false, false, false, false, false);
-        var firstStandingShotTime = visual.AnimationPlayer.CurrentAnimationPosition;
+        var firstStandingShotTime = animator.UpperBodyActionPosition;
         animator.PlayAction("shoot", 0.22f);
         animator.Update(0.02f, 0f, true, false, false, false, false, false, false);
-        var standingRetrigger = visual.AnimationPlayer.CurrentAnimationPosition > 0.0
-            && visual.AnimationPlayer.CurrentAnimationPosition < firstStandingShotTime * 0.5;
+        var standingRetrigger = animator.CurrentAnimation == prefix + "ready_idle"
+            && animator.UpperBodyActionPosition > 0.0
+            && animator.UpperBodyActionPosition < firstStandingShotTime * 0.5;
         animator.SetRestingPose(true);
         animator.Update(0.18f, 3f, true, false, false, false, false, false, false);
         var beforeReload = skeleton.GetBoneGlobalPose(foot).Origin;

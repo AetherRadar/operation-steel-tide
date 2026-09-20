@@ -7,6 +7,53 @@ namespace OperationSteelTide;
 
 public partial class OperatorPresentationDiagnostics
 {
+    private static void CheckCombatPosture(OperatorVisualId id, AuthoredOperatorVisual visual, List<string> failures)
+    {
+        var skeleton = Descendants<Skeleton3D>(visual.Root).First();
+        var hips = skeleton.FindBone("Hips");
+        var hands = new[] { skeleton.FindBone("LeftHand"), skeleton.FindBone("RightHand") };
+        void Pose(string name, double phase)
+        {
+            visual.AnimationPlayer.Play(name, 0);
+            visual.AnimationPlayer.Seek(visual.AnimationPlayer.GetAnimation(name).Length * phase, update: true);
+            visual.AnimationPlayer.Pause();
+        }
+        Pose("aim_idle", 0);
+        var standingHeight = skeleton.GetBoneGlobalPose(hips).Origin.Y;
+        var minimumRatio = 1.0f;
+        foreach (var pose in new[] { "run", "sprint", "aim_run", "ready_run" })
+        {
+            for (var sample = 0; sample <= 24; sample++)
+            {
+                Pose(pose, sample / 24.0);
+                minimumRatio = Mathf.Min(minimumRatio, skeleton.GetBoneGlobalPose(hips).Origin.Y / standingHeight);
+            }
+        }
+        var maximumTravel = 0.0f;
+        var maximumEndpoint = 0.0f;
+        foreach (var prefix in new[] { "", "pistol_" })
+        {
+            Pose(prefix + "aim_idle", 0);
+            var reference = hands.Select(bone => skeleton.GetBoneGlobalPose(bone).Origin).ToArray();
+            for (var sample = 0; sample <= 24; sample++)
+            {
+                Pose(prefix + "shoot", sample / 24.0);
+                for (var index = 0; index < hands.Length; index++)
+                {
+                    var travel = skeleton.GetBoneGlobalPose(hands[index]).Origin.DistanceTo(reference[index]);
+                    maximumTravel = Mathf.Max(maximumTravel, travel);
+                    if (sample is 0 or 24) maximumEndpoint = Mathf.Max(maximumEndpoint, travel);
+                }
+            }
+        }
+        var distinctGuard = id != OperatorVisualId.Garrison
+            || Descendants<MeshInstance3D>(visual.Root).Any(mesh => mesh.Name.ToString() == "GarrisonHelmet");
+        var valid = minimumRatio >= .90f && maximumTravel is > .003f and < .045f
+            && maximumEndpoint < .01f && distinctGuard;
+        GD.Print($"OPERATOR_COMBAT_POSTURE_CHECK visual={id} hips_ratio={minimumRatio:F3} recoil_travel={maximumTravel:F4} recoil_endpoint={maximumEndpoint:F4} identity={distinctGuard} valid={valid}");
+        if (!valid) failures.Add($"{id}:combat-posture");
+    }
+
     private static void CheckMagpieArmCoverage(List<Surface> surfaces, List<string> failures)
     {
         // A normalized skin and correct grip socket can still have no forearm.

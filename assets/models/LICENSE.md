@@ -1273,17 +1273,34 @@ Source, delivery mapping, modification details, and Godot review images are
 recorded in `source_art/hy3d_operators/README.md`; the current GLB hash is
 recorded in `assets/models/hy3d_operators/README.md`.
 
-The garrison runtime duplicate is rebuilt from the completed Viper Blender
-source by `scripts/blender/repair_operator_presentation.py -- --roles enemy`.
+The distinct garrison is rebuilt from the corrected Heron Blender source and
+the preserved olive-uniform and helmet designs in `source_art/chinese_garrison/`
+by `scripts/blender/repair_operator_presentation.py -- --roles enemy`.
+Creator: Operation Steel Tide contributors, adapting the same owner-approved
+Tencent outputs acquired 2026-09-04 and cleared for redistribution 2026-09-08.
+Source service: https://3d.hunyuan.tencent.com/ . These generated outputs retain
+the recorded owner permission, not an MIT relicensing; no additional attribution
+is required. The uniform paint and head-parented helmet were authored in Blender.
 It retains the complete authored presentation, action, rifle/handgun socket,
 and palm-frame contract, including `RifleCarrySocket`, `LeftPalmFrame`, and
 `RightPalmFrame` so runtime carry does not apply a second arm solve to the
 skinned mesh. The 2026-09-20
-rebuild is `assets/models/enemy_operator/enemy_operator.glb` (23,182,792 bytes,
-SHA-256 `4AC10D51F887CD722B737D28F3EA300466AE56E7BE6EF90509E76E9EBB22365A`)
+rebuild is `assets/models/enemy_operator/enemy_operator.glb` (37,874,100 bytes,
+SHA-256 `6C295558887E37B998F98A05AE89532BAB2C14A3D1A55192088C1EC2349AB158`)
 with editable source `source_art/combat_models/enemy_operator.blend`
-(41,231,946 bytes, SHA-256
-`B7F0C9D43F1D0B04CC23283E56B92E0DC84DB224FDDB2C573079DB5251ABE4FC`).
+(54,400,432 bytes, SHA-256
+`801E8C60226BFB1507AFEABF63419A68904D65A6D788AF82FA5EB51E33AAE216`).
+
+The 2026-09-20 upright run and closed-recoil actions are baked in Blender for
+all five operators and the garrison; the existing CC0 action-source terms are
+unchanged. Lantern Canal's eight unarmed residents reuse Heron and Magpie under
+the same permission. No additional character acquisition is introduced.
+
+The optimized Lantern Canal city and mountain-only scene are recorded in
+`assets/models/lantern_canal_world/LICENSE.md`, including their creators, source
+URLs, exact permission, acquisition dates, editable-source mapping, and hashes.
+The city retains AetherRadar's owner-authorized redistribution terms; the
+project-authored Jianghai mountain extraction retains the root MIT license.
 
 The Ultimate Guns Pack is distributed by Quaternius under CC0 1.0 Universal:
 
