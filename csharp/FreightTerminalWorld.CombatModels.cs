@@ -22,6 +22,7 @@ public partial class FreightTerminalWorld
         var count = 0;
         var actionCount = 0;
         var fingerBoneCount = 0;
+        var hitPriorityValid = false;
         try
         {
             // Exercise the delivered HY-3D contract directly.  The default
@@ -84,11 +85,14 @@ public partial class FreightTerminalWorld
             Sample(1.1f, true, true, false, true, false, false, false);
             Sample(0.0f, false, false, false, false, false, true, false);
             Sample(0.0f, false, false, false, false, true, false, false);
-            animator.PlayHit();
+            var downedHitRejected = !animator.PlayHit();
             transitions.Add(animator.CurrentAnimation);
             animator.PlayRevived();
             transitions.Add(animator.CurrentAnimation);
             animator.Update(0.7f, 0.0f, false, false, false, false, false, false, false);
+            animator.SetRestingPose(false);
+            hitPriorityValid = downedHitRejected && animator.PlayHit();
+            transitions.Add(animator.CurrentAnimation);
             animator.SetRestingPose(false);
             SampleUpright(1.5f, false, false);
             SampleUpright(3.4f, false, false);
@@ -161,8 +165,8 @@ public partial class FreightTerminalWorld
             "ready_walk", "ready_run", "ready_sprint", "aim_walk", "aim_run", "aim_sprint",
             "crouch_idle", "crouch_walk", "ready_crouch_idle", "ready_crouch_walk",
             "aim_crouch_idle", "aim_crouch_walk",
-            "rifle_prone_idle", "rifle_prone_crawl", "revive_kneel", "downed", "hit",
-            "revived", "death"
+            "rifle_prone_idle", "rifle_prone_crawl", "revive_kneel", "downed", "downed",
+            "revived", "hit", "death"
         };
         var transitionsValid = transitions.SequenceEqual(expected);
         var expectedUprightTransitions = new[]
@@ -184,6 +188,7 @@ public partial class FreightTerminalWorld
             && actionCoverage
             && fingerRigCoverage
             && transitionsValid
+            && hitPriorityValid
             && uprightTransitionsValid
             && rifleFit.Valid
             && movementRifleFitValid
@@ -206,7 +211,7 @@ public partial class FreightTerminalWorld
             + $"transitions={string.Join('>', transitions)} expected={string.Join('>', expected)} "
             + $"upright_transitions={string.Join('>', uprightTransitions)} "
             + $"upright_expected={string.Join('>', expectedUprightTransitions)} "
-            + $"upright_transitions_valid={uprightTransitionsValid}");
+            + $"upright_transitions_valid={uprightTransitionsValid} hit_priority={hitPriorityValid}");
         GD.Print($"OPERATOR_ANIMATIONS_PASS valid={valid}");
         visual?.Root.QueueFree();
         QuitDiagnosticAfterSceneCleanup(valid ? 0 : 2);

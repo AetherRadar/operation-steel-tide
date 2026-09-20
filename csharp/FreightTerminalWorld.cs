@@ -3476,6 +3476,12 @@ public partial class FreightTerminalWorld : Node3D
             Quantity = 2,
             Grade = LootGrade.Rare
         });
+        _player.EquipFromLoot(new LootItem
+        {
+            Kind = LootItemKind.Equipment,
+            Equipment = EquipmentCatalog.Create("armor_patrol"),
+            Grade = LootGrade.Common
+        });
         _player.SetArmorForDiagnostics(20.0f);
         Input.ActionRelease("move_forward");
         Input.ActionRelease("use_plate");
