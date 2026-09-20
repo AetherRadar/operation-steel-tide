@@ -7,9 +7,9 @@ namespace OperationSteelTide;
 public partial class FreightTerminalWorld
 {
     private const string LanternCanalScenePath =
-        "res://assets/models/lantern_canal_world/lantern_canal_world_v2_5.glb";
+        LanternCanalPreloadCache.CityPath;
     private const string LanternCanalBackdropScenePath =
-        "res://assets/models/jianghai_old_city/jianghai_old_city.glb";
+        LanternCanalPreloadCache.MountainsPath;
     private static readonly Vector3 LanternCanalDeploymentPoint = new(-68.0f, 1.32f, 76.0f);
     private static readonly Vector3 LanternCanalExtractionPoint = new(-68.0f, 1.12f, -88.0f);
     private static readonly Vector3[] LanternCanalHostilePads =
@@ -36,12 +36,14 @@ public partial class FreightTerminalWorld
     private int _lanternCanalLootCount;
     private int _lanternCanalObjectiveCount;
     private int _lanternCanalMountainMeshCount;
+    private long _lanternCanalBuildMilliseconds;
 
     private bool IsLanternCanalMap
         => string.Equals(_activeRuntimeMapId, DeploymentMapCatalog.LanternCanalId, StringComparison.OrdinalIgnoreCase);
 
     private void BuildLanternCanalLevel()
     {
+        var buildClock = System.Diagnostics.Stopwatch.StartNew();
         _levelRoot = new Node3D { Name = "LanternCanalDistrict" };
         AddChild(_levelRoot);
         _lanternCanalBackdrop = LoadLanternCanalMountainBackdrop();
@@ -58,12 +60,13 @@ public partial class FreightTerminalWorld
         var white = Mat("lantern_canal_marking", new Color(0.76f, 0.77f, 0.72f), 0.02f, 0.8f);
         BuildExtraction(concrete, iron, yellow, white);
         _extractionMarker.Visible = true;
+        _lanternCanalBuildMilliseconds = buildClock.ElapsedMilliseconds;
+        GD.Print($"LANTERN_CANAL_LOAD preload_ms={LanternCanalPreloadCache.LoadMilliseconds} yielded_frames={LanternCanalPreloadCache.YieldedFrames} build_ms={_lanternCanalBuildMilliseconds}");
     }
 
     private Node3D LoadLanternCanalScene(string path, string name)
     {
-        var packedScene = GD.Load<PackedScene>(path)
-            ?? throw new InvalidOperationException($"Unable to load Lantern Canal asset '{path}'.");
+        var packedScene = LanternCanalPreloadCache.Acquire(path);
         var instance = packedScene.Instantiate();
         if (instance is not Node3D root)
         {
@@ -198,6 +201,11 @@ public partial class FreightTerminalWorld
 
     private void SpawnLanternCanalEnemies()
     {
+        foreach (var resident in LanternCanalPopulation.Spawn(this, _languageSetting))
+        {
+            _civilians.Add(resident);
+            RegisterResidentialLanguageRefresher(resident.SetLanguage);
+        }
         foreach (var route in LanternCanalPatrolRoutes)
         {
             var enemy = SpawnEnemy(route[0], false, teamId: 0);

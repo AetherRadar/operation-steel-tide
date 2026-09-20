@@ -78,6 +78,7 @@ public static class DeploymentMapRuntime
 
         if (Array.Exists(args, value =>
                 value is "--validate-lantern-canal"
+                    or "--validate-lantern-performance"
                     or "--capture-lantern-canal"))
         {
             SelectMap(DeploymentMapCatalog.LanternCanalId);

@@ -165,6 +165,7 @@ public partial class FreightTerminalWorld
             ("--validate-residential", static world => world.ValidateResidentialCommunity()),
             ("--validate-residential-survival", static world => world.ValidateResidentialSurvival()),
             ("--validate-lantern-canal", static world => world.ValidateLanternCanal()),
+            ("--validate-lantern-performance", static world => world.ValidateLanternCanalPerformance()),
             ("--validate-residential-gameplay", static world => world.ValidateResidentialGameplay()),
             ("--validate-residential-localization", static world => world.ValidateResidentialLocalization()),
             ("--validate-residential-cover", static world => world.ValidateResidentialCover()),

@@ -700,6 +700,8 @@ public partial class FreightTerminalWorld
 
     private void OnDeploymentMapSelectionChanged(string mapId)
     {
+        if (mapId == DeploymentMapCatalog.LanternCanalId)
+            LanternCanalPreloadCache.Request();
         _deploymentLoadGeneration++;
         _jianghaiDeploymentLoadPending = false;
         if (_diagnosticSceneLoadFallbackAllowed)
@@ -731,6 +733,12 @@ public partial class FreightTerminalWorld
 
     private async Task<bool> PrepareDeploymentMapAsync(string mapId)
     {
+        if (mapId == DeploymentMapCatalog.LanternCanalId)
+        {
+            _hud.SetSquadStatus(GameLocalization.Get("squad_lobby_loading", _languageSetting,
+                "SYNCHRONIZING OPERATION  //  LOADING SHARED WORLD"));
+            return await LanternCanalPreloadCache.EnsureReadyAsync(GetTree());
+        }
         if (!string.Equals(
                 mapId,
                 DeploymentMapCatalog.BlackwaterRefineryId,

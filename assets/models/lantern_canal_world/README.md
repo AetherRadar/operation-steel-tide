@@ -3,7 +3,9 @@
 This directory contains the authored extraction-map assets imported from the
 repository owner's `AetherRadar/lantern-canal-world` release **v2.5**.
 
-- Runtime asset: `lantern_canal_world_v2_5.glb` (589,056,208 bytes; 11,611,673 triangles)
+- Original asset: `lantern_canal_world_v2_5.glb` (589,056,208 bytes; 11,611,673 upstream triangles)
+- Runtime derivative: `lantern_canal_runtime.glb` (292,030,388 bytes; 3,900,204 Blender triangles)
+- Mountain-only backdrop: `lantern_mountains.glb` (706,708 bytes)
 - Inspection slice: `lantern_canal_workshops_v2_5.glb` (45,575,920 bytes)
 - Source release: https://github.com/AetherRadar/lantern-canal-world/releases/tag/v2.5
 - Upstream scene: `craft_workshops_v2_5_detail.glb`
@@ -16,9 +18,10 @@ repository owner's `AetherRadar/lantern-canal-world` release **v2.5**.
 The complete city contains the Qingci ceramics workshop and Caiyun silk shop,
 their three-floor interiors, authored stairs, workshop furniture, embedded PBR
 textures, named inspection cameras, and authored interior light nodes. Map 05
-loads this single complete city GLB. The former Jianghai Old City backdrop is
-reduced to its authored mountain ring only, so no duplicate city shell or
-floating storefront geometry is rendered.
+loads the optimized complete city derivative. The Jianghai backdrop is a
+separate twelve-mountain export, so no hidden second city is loaded or retained.
+Original access meshes remain intact. See `docs/LANTERN_CANAL_PERFORMANCE.md`
+for the Blender rebuild and rendered performance/geometry validation.
 
 The Godot map adapter owns only invisible collision/navigation scaffolding and
 gameplay placement. It does not reshape, rescale, or visually repair the GLB.

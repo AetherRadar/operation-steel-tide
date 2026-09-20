@@ -160,7 +160,7 @@ public partial class FreightTerminalWorld : Node3D
     private bool _fullscreenSetting;
     private string _languageSetting = GameLocalization.DefaultLanguage;
 
-    public override void _Ready()
+    public override async void _Ready()
     {
         var args = OS.GetCmdlineUserArgs();
         _activeRuntimeMapId = DeploymentMapRuntime.ResolveStartupMap(args);
@@ -185,6 +185,12 @@ public partial class FreightTerminalWorld : Node3D
         }
         LoadSettings();
         InitializeOperatorProgression();
+        if (IsLanternCanalMap)
+        {
+            SetProcess(false);
+            await LanternCanalPreloadCache.EnsureReadyAsync(GetTree());
+            if (!IsInsideTree()) return;
+        }
         InitMissionDirector();
         BuildEnvironment();
         BuildLevel();
@@ -241,12 +247,15 @@ public partial class FreightTerminalWorld : Node3D
         ApplyTimeOfDay(startupTimeOfDay);
 
         InitializeOperationsOfficeState(args);
+        if (IsLanternCanalMap) SetProcess(true);
+        GD.Print("STEEL_TIDE_RUNTIME_READY");
         RuntimeDiagnosticRunner.RunFirst(this, args);
         ResumePendingExtractionDeployment();
     }
 
     public override void _ExitTree()
     {
+        if (IsLanternCanalMap) LanternCanalPreloadCache.ReleaseReady();
         DetachSquadNetworkEvents();
         CleanupOperatorProgression();
         // Drop cached resources and stop long-lived nodes before Mono tears down

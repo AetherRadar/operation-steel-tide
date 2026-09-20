@@ -19,7 +19,25 @@ owner from their own public repository:
 
 The upstream validation report records 11,611,673 triangles in the complete
 city, 215 embedded images, no external textures, six named cameras, and 357/357
-sampled stairs/platform/doorway clearance probes. Map 05 loads the complete
-589 MB city directly; the separate 45.6 MB workshop extraction remains for
+sampled stairs/platform/doorway clearance probes. The original complete
+589 MB city and the separate 45.6 MB workshop extraction remain for
 inspection and Blender round-trip work. Neither file is relicensed as MIT by
 the project code.
+
+## Runtime derivatives, 2026-09-20
+
+The same owner-authorized city is optimized in Blender, retaining its UVs,
+materials and named traversal geometry. Mapping:
+`source_art/lantern_canal_world/lantern_canal_runtime.blend` to
+`lantern_canal_runtime.glb`, SHA-256
+`85B4D3CB9AC0E2969D49C6FC6CC945B530B5093B08755169870244966AC9FB54`.
+Acquisition/source release and redistribution permission remain as above.
+No additional attribution condition or new third-party asset is introduced.
+
+The mountain-only source/export pair `lantern_mountains.blend` / `.glb` retains
+the twelve project-authored Jianghai mountain meshes and their existing
+project-authored materials. Creator: Operation Steel Tide contributors;
+source: this repository's `source_art/world/jianghai_old_city/jianghai_old_city.blend`;
+license: root MIT; extraction date: 2026-09-20; no external attribution required.
+Export SHA-256:
+`747A6B747BB088A37D373DFB305658FDBA7EA329A9B7A3111DC8BFA877E41E56`.

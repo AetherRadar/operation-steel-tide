@@ -51,7 +51,8 @@ public partial class FreightTerminalWorld
             var visibleMountainCount = CountVisibleLanternCanalMeshes(_lanternCanalBackdrop);
             using var completeCityFile = FileAccess.Open(LanternCanalScenePath, FileAccess.ModeFlags.Read);
             var completeCityBytes = completeCityFile?.GetLength() ?? 0;
-            var completeCityReady = completeCityBytes >= 580_000_000;
+            var completeCityReady = completeCityBytes is > 0 and < 330_000_000
+                && meshCount >= 180;
             var backdropReady = IsInstanceValid(_lanternCanalBackdrop)
                 && _lanternCanalMountainMeshCount >= 12
                 && visibleMountainCount == _lanternCanalMountainMeshCount;
