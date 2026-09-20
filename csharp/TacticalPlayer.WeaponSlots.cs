@@ -89,7 +89,7 @@ public partial class TacticalPlayer
         LootGrade grade,
         PlayerWeaponSlot? requestedSlot = null)
     {
-        var target = requestedSlot ?? (WeaponCatalog.IsSidearm(build.Platform)
+        var target = requestedSlot ?? AutomaticWeaponSlot(build.Platform, grade) ?? (WeaponCatalog.IsSidearm(build.Platform)
             ? PlayerWeaponSlot.Sidearm
             : EmptyLongGunSlot());
         var previousBuild = WeaponBuildForSlot(target)?.Clone();
@@ -117,6 +117,13 @@ public partial class TacticalPlayer
                 Grade = previousGrade
             };
     }
+
+    internal PlayerWeaponSlot? AutomaticWeaponSlot(WeaponPlatform platform, LootGrade grade)
+        => LootInteractionPolicy.SelectAutomaticWeaponSlot(
+            WeaponCatalog.IsSidearm(platform), grade,
+            HasFireablePrimary ? PrimaryWeaponGrade : null,
+            HasSecondaryWeapon ? SecondaryWeaponGrade : null,
+            HasSidearmWeapon ? SidearmWeaponGrade : null);
 
     private static bool WeaponFitsSlot(WeaponPlatform platform, PlayerWeaponSlot slot)
         => WeaponCatalog.IsSidearm(platform)

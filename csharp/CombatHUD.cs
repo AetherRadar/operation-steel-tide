@@ -117,12 +117,9 @@ public partial class CombatHUD : CanvasLayer
     private LootDropZone _groundDropZone = null!;
     private ScrollContainer _backpackScroll = null!;
     private LootWeaponRackView _lootWeaponRack = null!;
-    private LootDropZone _helmetSlot = null!;
-    private LootDropZone _armorSlot = null!;
-    private LootDropZone _packSlot = null!;
-    private Label _helmetSlotLabel = null!;
-    private Label _armorSlotLabel = null!;
-    private Label _packSlotLabel = null!;
+    private LootEquipmentSlotView _helmetSlot = null!;
+    private LootEquipmentSlotView _armorSlot = null!;
+    private LootEquipmentSlotView _packSlot = null!;
     private Label _helmetSlotCaption = null!;
     private Label _armorSlotCaption = null!;
     private Label _packSlotCaption = null!;
@@ -138,9 +135,6 @@ public partial class CombatHUD : CanvasLayer
     private Label _lootHint = null!;
     private Button _backpackHotkeyButton = null!;
     private Label _backpackHotkeyValue = null!;
-    private InventoryModelPreview _helmetPreview = null!;
-    private InventoryModelPreview _armorPreview = null!;
-    private InventoryModelPreview _packPreview = null!;
     private ColorRect _weaponDetailOverlay = null!;
     private Label _weaponDetailTitle = null!;
     private Label _weaponDetailStatsCaption = null!;
@@ -768,9 +762,9 @@ public partial class CombatHUD : CanvasLayer
             SignalName.WeaponOpticDetachRequested,
             (int)slot);
         panel.AddChild(_lootWeaponRack);
-        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(1610, 174), new Vector2(160, 88), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption, out _helmetSlotLabel, out _helmetPreview);
-        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(1610, 268), new Vector2(160, 96), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption, out _armorSlotLabel, out _armorPreview);
-        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK CONTAINER", new Vector2(1610, 370), new Vector2(160, 100), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption, out _packSlotLabel, out _packPreview);
+        _helmetSlot = BuildEquipmentSlot(panel, LootDropTarget.Helmet, "HELMET", new Vector2(1610, 174), new Vector2(160, 88), new Color(0.84f, 0.66f, 0.3f), out _helmetSlotCaption);
+        _armorSlot = BuildEquipmentSlot(panel, LootDropTarget.BodyArmor, "BODY ARMOR", new Vector2(1610, 268), new Vector2(160, 96), new Color(0.35f, 0.68f, 0.94f), out _armorSlotCaption);
+        _packSlot = BuildEquipmentSlot(panel, LootDropTarget.BackpackGear, "BACKPACK CONTAINER", new Vector2(1610, 370), new Vector2(160, 100), new Color(0.62f, 0.55f, 0.86f), out _packSlotCaption);
 
         _backpackItemsCaption = PositionedLabel("BACKPACK STORAGE", 12, new Color(0.43f, 0.72f, 0.96f), 940, 484);
         _backpackItemsCaption.Size = new Vector2(340, 22);
@@ -819,97 +813,33 @@ public partial class CombatHUD : CanvasLayer
         BuildLootItemActionMenu();
     }
 
-    private LootDropZone BuildEquipmentSlot(
+    private LootEquipmentSlotView BuildEquipmentSlot(
         Control parent,
         LootDropTarget target,
         string title,
         Vector2 position,
         Vector2 size,
         Color accent,
-        out Label caption,
-        out Label content,
-        out InventoryModelPreview preview)
+        out Label caption)
     {
-        var zone = new LootDropZone
-        {
-            Target = target,
-            Position = position,
-            Size = size
-        };
-        zone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(accent));
+        var zone = HudPackedSceneCache.Instantiate<LootEquipmentSlotView>(LootEquipmentSlotView.ScenePath);
+        zone.Target = target;
+        zone.Position = position;
+        zone.Size = size;
+        zone.SetAccent(accent);
         zone.Dropped += HandleLootDrop;
         parent.AddChild(zone);
-        var box = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        zone.AddChild(box);
-        caption = Label(title, 11, accent);
-        caption.MouseFilter = Control.MouseFilterEnum.Ignore;
-        box.AddChild(caption);
-        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        box.AddChild(row);
-        preview = new InventoryModelPreview
-        {
-            CustomMinimumSize = new Vector2(62, 62),
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
-            Modulate = new Color(1, 1, 1, 0)
-        };
-        preview.Configure(target switch
-        {
-            LootDropTarget.Helmet => InventoryPreviewKind.Helmet,
-            LootDropTarget.BodyArmor => InventoryPreviewKind.BodyArmor,
-            _ => InventoryPreviewKind.Backpack
-        });
-        var visual = new Control
-        {
-            CustomMinimumSize = new Vector2(62, 62),
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
-        preview.Position = Vector2.Zero;
-        preview.Size = new Vector2(62, 62);
-        visual.AddChild(preview);
-        var generatedIcon = new LootItemIconControl
-        {
-            Position = Vector2.Zero,
-            Size = new Vector2(62, 62),
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
-        generatedIcon.Configure(
-            LootItemKind.Equipment,
-            target switch
-            {
-                LootDropTarget.Helmet => EquipmentSlot.Helmet,
-                LootDropTarget.BodyArmor => EquipmentSlot.BodyArmor,
-                _ => EquipmentSlot.Backpack
-            },
-            accent,
-            target switch
-            {
-                LootDropTarget.Helmet => "helmet",
-                LootDropTarget.BodyArmor => "heavy_armor",
-                _ => "expedition_pack"
-            });
-        visual.AddChild(generatedIcon);
-        row.AddChild(visual);
-        content = Label("", 11, new Color(0.78f, 0.86f, 0.83f));
-        content.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        content.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        content.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        content.MouseFilter = Control.MouseFilterEnum.Ignore;
-        row.AddChild(content);
-        var removeButton = new Button
-        {
-            Text = "REMOVE",
-            CustomMinimumSize = new Vector2(54, 28),
-            TooltipText = "Unequip this item",
-            FocusMode = Control.FocusModeEnum.None
-        };
+        zone.SetLanguage(_language);
+        caption = zone.Caption;
+        caption.Text = title;
+        caption.AddThemeColorOverride("font_color", accent);
         var equipmentSlot = target switch
         {
             LootDropTarget.Helmet => EquipmentSlot.Helmet,
             LootDropTarget.BodyArmor => EquipmentSlot.BodyArmor,
             _ => EquipmentSlot.Backpack
         };
-        removeButton.Pressed += () => HandleUnequipEquipment(equipmentSlot);
-        row.AddChild(removeButton);
+        zone.RemoveRequested += () => HandleUnequipEquipment(equipmentSlot);
         return zone;
     }
 
@@ -1144,12 +1074,9 @@ public partial class CombatHUD : CanvasLayer
         {
             _lootStats.Text = Text("comparison_no_primary", "NO PRIMARY WEAPON EQUIPPED");
         }
-        _helmetSlotLabel.Text = EquipmentSlotText(_shownPlayer.EquippedHelmet, EquipmentSlot.Helmet);
-        _armorSlotLabel.Text = EquipmentSlotText(_shownPlayer.EquippedBodyArmor, EquipmentSlot.BodyArmor);
-        _packSlotLabel.Text = EquipmentSlotText(_shownPlayer.EquippedBackpack, EquipmentSlot.Backpack);
-        _helmetPreview.Configure(InventoryPreviewKind.Helmet, _shownPlayer.EquippedHelmet);
-        _armorPreview.Configure(InventoryPreviewKind.BodyArmor, _shownPlayer.EquippedBodyArmor);
-        _packPreview.Configure(InventoryPreviewKind.Backpack, _shownPlayer.EquippedBackpack);
+        _helmetSlot.SetEquipment(_shownPlayer.EquippedHelmet, _language);
+        _armorSlot.SetEquipment(_shownPlayer.EquippedBodyArmor, _language);
+        _packSlot.SetEquipment(_shownPlayer.EquippedBackpack, _language);
         RefreshEquippedQualityStyles();
         _lootOperatorPreview.Configure(
             InventoryPreviewKind.Operator,
@@ -1206,20 +1133,6 @@ public partial class CombatHUD : CanvasLayer
             : $"BACKPACK VALUE  {totalValue}  //  GUNS + GEAR + AMMO";
         UpdateBackpackHotkey(_shownPlayer);
         UpdateLootToolbarPresentation();
-    }
-
-    private string EquipmentSlotText(EquipmentItem item, EquipmentSlot slot)
-    {
-        if (item.DefinitionId.EndsWith("_none", StringComparison.OrdinalIgnoreCase))
-        {
-            return slot switch
-            {
-                EquipmentSlot.Helmet => Text("empty_helmet", "EMPTY\nNO HELMET"),
-                EquipmentSlot.BodyArmor => Text("empty_body_armor", "EMPTY\nNO BODY ARMOR"),
-                _ => Text("empty_backpack", "EMPTY\nNO BACKPACK")
-            };
-        }
-        return item.DisplayName(_language) + "\n" + item.Detail(_language);
     }
 
     public void UpdateBackpackHotkey(TacticalPlayer? player)

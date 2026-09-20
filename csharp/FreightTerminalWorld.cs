@@ -2670,7 +2670,15 @@ public partial class FreightTerminalWorld : Node3D
             return;
         }
         var index = _openLootSource.Loot.FindIndex(item => item.Id == itemId);
-        if (index < 0 || !_player.TryStoreInBackpack(_openLootSource.Loot[index]))
+        if (index < 0) return;
+        var incoming = _openLootSource.Loot[index];
+        if (incoming.Kind == LootItemKind.Weapon && incoming.Weapon is not null
+            && _player.AutomaticWeaponSlot(incoming.Weapon.Platform, incoming.Grade) is not null)
+        {
+            EquipLootItem(itemId, refreshView);
+            return;
+        }
+        if (!_player.TryStoreInBackpack(incoming))
         {
             return;
         }
@@ -2689,6 +2697,9 @@ public partial class FreightTerminalWorld : Node3D
     }
 
     private void EquipLootItem(string itemId)
+        => EquipLootItem(itemId, refreshView: true);
+
+    private void EquipLootItem(string itemId, bool refreshView)
     {
         if (LocalPlayerCannotInteract || _openLootSource is null)
         {
@@ -2719,7 +2730,7 @@ public partial class FreightTerminalWorld : Node3D
             enemy.MarkCarriedWeaponRemoved();
         }
         PublishExtractionLootMutation(_openLootSource);
-        RefreshLootView();
+        if (refreshView) RefreshLootView();
     }
 
     private void UseBackpackItem(string itemId)
@@ -4044,9 +4055,9 @@ public partial class FreightTerminalWorld : Node3D
                 hasPrimaryWeapon: false,
                 hasSecondaryWeapon: false,
                 hasSidearmWeapon: true) == LootSourceActivationAction.MoveToBackpack
-            && LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Weapon, true)
+            && LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Weapon, false, true, true, true)
                 == LootSourceActivationAction.MoveToBackpack
-            && LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Valuable, false)
+            && LootInteractionPolicy.ResolveSourceActivation(LootItemKind.Valuable, false, false, false, false)
                 == LootSourceActivationAction.MoveToBackpack
             && LootInteractionPolicy.GetBackpackMenuCapabilities(LootItemKind.Weapon)
                 == new LootBackpackMenuCapabilities(true, true)
@@ -4447,6 +4458,10 @@ public partial class FreightTerminalWorld : Node3D
         {
             enemy.ProcessMode = ProcessModeEnum.Disabled;
         }
+        target.GlobalPosition = new Vector3(0, .2f, 80);
+        _player.GlobalPosition = new Vector3(0, .2f, 82);
+        _player.Velocity = Vector3.Zero;
+        _player.FaceWorldPointForDiagnostics(target.GlobalPosition);
         target.TakeDamage(500.0f, target.GlobalPosition + Vector3.Up * 1.1f, _player);
         await WaitFrames(42);
         var closedBackpackReady = target.CorpseBackpackVisualReady && !target.IsOpened;

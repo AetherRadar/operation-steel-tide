@@ -155,6 +155,7 @@ public partial class FreightTerminalWorld
             ("--validate-progression", static world => world.ValidateProgressionFlow()),
             ("--validate-deployment-ui", static world => world.ValidateDeploymentUi()),
             ("--validate-backpack-tab", static world => world.ValidateBackpackTab()),
+            ("--validate-inventory-equipment", static world => world.ValidateInventoryEquipment()),
             ("--validate-skylinks", static world => world.ValidateSkyLinks()),
             ("--validate-skybridge-access", static world => world.ValidateSkybridgeAccess()),
             ("--validate-vehicle-drive", static world => world.ValidateVehicleDrive()),

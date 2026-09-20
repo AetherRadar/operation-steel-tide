@@ -366,10 +366,10 @@ public partial class CombatHUD
             _shownPlayer.EquippedBackpackGrade);
     }
 
-    private void StyleEquippedSlot(LootDropZone zone, Label caption, string slotName, LootGrade grade)
+    private void StyleEquippedSlot(LootEquipmentSlotView zone, Label caption, string slotName, LootGrade grade)
     {
         var color = LootGrades.GlowColor(grade);
-        zone.AddThemeStyleboxOverride("panel", LootDropZone.ZoneStyle(color));
+        zone.SetAccent(color);
         caption.Text = $"{slotName}  //  {LootGrades.DisplayName(grade, _language)}";
         caption.AddThemeColorOverride("font_color", color);
     }

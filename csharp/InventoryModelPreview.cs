@@ -31,6 +31,8 @@ public partial class InventoryModelPreview : SubViewportContainer
     private Camera3D? _camera;
     private int _renderRevision;
     private static Sky? _operatorSky;
+    private Vector3 _rifleBoundsSize;
+    private static Sky? _compactSky;
 
     internal bool RenderRefreshActiveForDiagnostics
         => IsInstanceValid(_viewport)
@@ -200,12 +202,22 @@ public partial class InventoryModelPreview : SubViewportContainer
         {
             BackgroundMode = Godot.Environment.BGMode.Color,
             BackgroundColor = new Color(0, 0, 0, 0),
-            AmbientLightSource = Godot.Environment.AmbientSource.Color,
+            Sky = _compactSky ??= new Sky
+            {
+                SkyMaterial = new ProceduralSkyMaterial
+                {
+                    SkyTopColor = new Color(.65f, .68f, .72f),
+                    SkyHorizonColor = new Color(.85f, .85f, .85f),
+                GroundBottomColor = new Color(.65f, .68f, .72f),
+                    GroundHorizonColor = new Color(.65f, .65f, .65f)
+                }
+            },
+            AmbientLightSource = Godot.Environment.AmbientSource.Sky,
             AmbientLightColor = new Color(0.58f, 0.68f, 0.65f),
-            AmbientLightEnergy = 1.05f,
-            ReflectedLightSource = Godot.Environment.ReflectionSource.Disabled,
+            AmbientLightEnergy = 1.35f,
+            ReflectedLightSource = Godot.Environment.ReflectionSource.Sky,
             TonemapMode = Godot.Environment.ToneMapper.Aces,
-            TonemapExposure = 0.92f,
+            TonemapExposure = 1.4f,
             TonemapWhite = 1.8f
         };
 
@@ -279,7 +291,7 @@ public partial class InventoryModelPreview : SubViewportContainer
             return;
         }
 
-        var bounds = CombatModelLibrary.ComputeBounds(_modelRoot);
+        var bounds = VisiblePreviewBounds(_modelRoot);
         if (bounds.MeshCount == 0)
         {
             return;
@@ -289,8 +301,44 @@ public partial class InventoryModelPreview : SubViewportContainer
         // imported bounds after applying the presentation rotation so a valid
         // rifle cannot end up outside the orthographic preview camera.
         _modelRoot.Position = -bounds.Center;
-        var verticalExtent = Mathf.Max(0.01f, bounds.Size.Y);
-        _camera.Size = Mathf.Max(_camera.Size, verticalExtent * 1.28f);
+        _rifleBoundsSize = bounds.Size;
+        FitRifleCamera();
+    }
+
+    private void FitRifleCamera()
+    {
+        if (_kind != InventoryPreviewKind.Rifle || _camera is null || Size.Y <= 0) return;
+        var aspect = Mathf.Max(.1f, Size.X / Size.Y);
+        _camera.Size = Mathf.Max(.05f, Mathf.Max(_rifleBoundsSize.X, _rifleBoundsSize.Y * aspect) * 1.04f);
+    }
+
+    private static (int MeshCount, Vector3 Size, Vector3 Center) VisiblePreviewBounds(Node3D root)
+    {
+        var minimum = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+        var maximum = -minimum;
+        var count = 0;
+        void Visit(Node3D node, Transform3D parent)
+        {
+            if (!node.Visible) return;
+            var transform = parent * node.Transform;
+            if (node is MeshInstance3D { Mesh: not null } mesh)
+            {
+                var bounds = mesh.Mesh.GetAabb();
+                for (var corner = 0; corner < 8; corner++)
+                {
+                    var point = transform * (bounds.Position + bounds.Size * new Vector3(
+                        corner & 1, (corner >> 1) & 1, (corner >> 2) & 1));
+                    minimum = minimum.Min(point);
+                    maximum = maximum.Max(point);
+                }
+                count++;
+            }
+            foreach (var child in node.GetChildren())
+                if (child is Node3D child3D) Visit(child3D, transform);
+        }
+        Visit(root, Transform3D.Identity);
+        return count == 0 ? (0, Vector3.Zero, Vector3.Zero)
+            : (count, maximum - minimum, (maximum + minimum) * .5f);
     }
 
     private void RequestRender()
@@ -337,7 +385,10 @@ public partial class InventoryModelPreview : SubViewportContainer
             && IsInstanceValid(_viewport);
 
     private void HandlePreviewResized()
-        => RequestRender();
+    {
+        FitRifleCamera();
+        RequestRender();
+    }
 
     private void HandlePreviewVisibilityChanged()
     {
@@ -359,173 +410,24 @@ public partial class InventoryModelPreview : SubViewportContainer
     private void BuildRifle(Node3D root)
     {
         var platform = _weapon?.Platform ?? WeaponPlatform.M4A1;
+        Node3D weaponRoot;
         if (platform == WeaponPlatform.DesertEagle)
-        {
-            TryBuildAuthoredDesertEagle(root);
-            return;
-        }
-        if (platform == WeaponPlatform.GSh18 && TryBuildAuthoredGsh18(root))
-        {
-            return;
-        }
-        if (TryBuildAuthoredPlatform(root, platform))
-        {
-            return;
-        }
-        if (platform == WeaponPlatform.AK74)
-        {
-            // AK-47 is production-authored only. Leaving the preview empty makes
-            // an asset failure visible without substituting the legacy toy mesh.
-            return;
-        }
-        if (WeaponCatalog.IsSidearm(platform))
-        {
-            BuildSidearm(root, platform);
-            return;
-        }
-        var metal = platform switch
-        {
-            WeaponPlatform.AK74 => new Color(0.19f, 0.2f, 0.18f),
-            WeaponPlatform.ScarL => new Color(0.43f, 0.36f, 0.24f),
-            WeaponPlatform.M24 => new Color(0.18f, 0.24f, 0.17f),
-            WeaponPlatform.AXMC => new Color(0.04f, 0.23f, 0.23f),
-            WeaponPlatform.MP5A5 => new Color(0.055f, 0.065f, 0.06f),
-            WeaponPlatform.M3A1 => new Color(0.24f, 0.28f, 0.26f),
-            WeaponPlatform.AWM => new Color(0.22f, 0.24f, 0.23f),
-            WeaponPlatform.VSS => new Color(0.08f, 0.12f, 0.075f),
-            _ => new Color(0.12f, 0.15f, 0.145f)
-        };
-        var furniture = platform switch
-        {
-            WeaponPlatform.AK74 => new Color(0.35f, 0.19f, 0.09f),
-            WeaponPlatform.M24 => new Color(0.2f, 0.31f, 0.18f),
-            WeaponPlatform.AXMC => new Color(0.08f, 0.4f, 0.35f),
-            WeaponPlatform.M3A1 => new Color(0.13f, 0.15f, 0.14f),
-            WeaponPlatform.AWM => new Color(0.16f, 0.19f, 0.17f),
-            WeaponPlatform.VSS => new Color(0.17f, 0.25f, 0.14f),
-            _ => metal.Lightened(0.12f)
-        };
-        var steel = new Color(0.44f, 0.5f, 0.48f);
-        var definition = WeaponCatalog.Weapon(platform);
-        var receiverLength = definition.ReceiverLength;
-        var barrelLength = definition.BarrelLength;
-        Box(root, new Vector3(receiverLength, 0.24f, 0.18f), new Vector3(0, 0, 0), metal, 0.55f);
-        Box(root, new Vector3(Mathf.Max(0.3f, receiverLength * 1.05f), 0.17f, 0.16f), new Vector3(-receiverLength * 0.95f, 0.01f, 0), furniture, 0.25f);
-        Box(root, new Vector3(Mathf.Max(0.3f, barrelLength * 0.72f), 0.16f, 0.14f), new Vector3(receiverLength * 0.92f, 0, 0), furniture, 0.28f);
-        Cylinder(root, 0.045f, barrelLength, new Vector3(receiverLength * 0.8f + barrelLength * 0.55f, 0.01f, 0), new Vector3(0, 0, Mathf.Pi / 2), steel, 0.75f, 0.72f);
-        Box(root, new Vector3(platform == WeaponPlatform.M3A1 ? 0.3f : 0.22f, platform == WeaponPlatform.M3A1 ? 0.045f : 0.08f, 0.17f), new Vector3(platform == WeaponPlatform.M3A1 ? -0.65f : -0.87f, 0, 0), furniture.Darkened(0.08f), 0.2f);
-        var magazineHeight = platform is WeaponPlatform.M24 or WeaponPlatform.AXMC ? 0.2f : platform == WeaponPlatform.MP5A5 ? 0.5f : platform == WeaponPlatform.M3A1 ? 0.38f : 0.44f;
-        Box(root, new Vector3(0.16f, magazineHeight, 0.15f), new Vector3(0.06f, -magazineHeight * 0.58f, 0), furniture.Darkened(0.06f), 0.18f, rotation: new Vector3(0, 0, platform == WeaponPlatform.AK74 ? -0.12f : 0.04f));
-        Box(root, new Vector3(0.13f, 0.32f, 0.13f), new Vector3(-0.2f, -0.25f, 0), furniture, 0.18f, rotation: new Vector3(0, 0, -0.18f));
-        Box(root, new Vector3(0.36f, 0.045f, 0.18f), new Vector3(0.0f, 0.16f, 0), steel.Darkened(0.2f), 0.65f);
-        if (_weapon?.Attachments.ContainsKey(AttachmentSlot.Optic) != false)
-        {
-            Box(root, new Vector3(0.24f, 0.13f, 0.14f), new Vector3(0.02f, 0.26f, 0), steel.Darkened(0.12f), 0.7f);
-            Box(root, new Vector3(0.12f, 0.045f, 0.17f), new Vector3(0.02f, 0.18f, 0), steel, 0.72f);
-        }
-        if (_weapon?.Attachments.ContainsKey(AttachmentSlot.Muzzle) == true)
-        {
-            Cylinder(root, 0.075f, 0.3f, new Vector3(1.57f, 0.01f, 0), new Vector3(0, 0, Mathf.Pi / 2), steel.Darkened(0.2f), 0.82f, 0.7f);
-        }
-        if (platform == WeaponPlatform.AWM)
-        {
-            Cylinder(root, 0.035f, 0.78f, new Vector3(0.05f, 0.27f, 0), new Vector3(0, 0, Mathf.Pi / 2), steel.Darkened(0.1f), 0.9f, 0.24f);
-            Cylinder(root, 0.024f, 0.52f, new Vector3(0.62f, -0.24f, 0.12f), new Vector3(0, 0, 0.35f), steel.Darkened(0.22f), 0.82f, 0.4f);
-            Cylinder(root, 0.024f, 0.52f, new Vector3(0.62f, -0.24f, -0.12f), new Vector3(0, 0, -0.35f), steel.Darkened(0.22f), 0.82f, 0.4f);
-        }
-        else if (platform == WeaponPlatform.VSS)
-        {
-            Cylinder(root, 0.095f, 0.74f, new Vector3(0.78f, 0, 0), new Vector3(0, 0, Mathf.Pi / 2), metal.Darkened(0.22f), 0.75f, 0.48f);
-            Box(root, new Vector3(0.58f, 0.055f, 0.14f), new Vector3(-0.72f, 0.12f, 0), furniture, 0.15f, rotation: new Vector3(0, 0, 0.38f));
-            Box(root, new Vector3(0.58f, 0.055f, 0.14f), new Vector3(-0.72f, -0.12f, 0), furniture, 0.15f, rotation: new Vector3(0, 0, -0.38f));
-        }
-    }
-
-    private static void BuildSidearm(Node3D root, WeaponPlatform platform)
-    {
-        var gsh18 = platform == WeaponPlatform.GSh18;
-        var metal = gsh18
-            ? new Color(0.055f, 0.065f, 0.062f)
-            : new Color(0.12f, 0.14f, 0.135f);
-        var grip = platform == WeaponPlatform.M1911
-            ? new Color(0.28f, 0.13f, 0.06f)
-            : new Color(0.055f, 0.065f, 0.06f);
-        var slideLength = platform == WeaponPlatform.M1911 ? 0.76f : gsh18 ? 0.72f : 0.7f;
-        Box(root, new Vector3(slideLength, 0.18f, 0.2f),
-            new Vector3(0.08f, 0.1f, 0), metal, 0.65f, 0.38f);
-        Box(root, new Vector3(0.44f, 0.16f, 0.19f), new Vector3(-0.08f, -0.06f, 0), metal.Darkened(0.14f), 0.62f);
-        Box(root, new Vector3(0.22f, 0.62f, 0.2f), new Vector3(-0.25f, -0.38f, 0), grip, 0.12f, 0.72f,
-            rotation: new Vector3(0, 0, -0.22f));
-        Cylinder(root, 0.038f, 0.3f,
-            new Vector3(0.55f, 0.1f, 0), new Vector3(0, 0, Mathf.Pi / 2), metal.Darkened(0.2f), 0.86f, 0.22f);
-        Box(root, new Vector3(0.28f, 0.035f, 0.22f), new Vector3(0.05f, -0.22f, 0),
-            grip.Darkened(0.18f), 0.42f, rotation: new Vector3(0, 0, 0.12f));
-    }
-
-    private static bool TryBuildAuthoredDesertEagle(Node3D root)
-    {
-        try
-        {
-            var orientation = new Node3D
-            {
-                Name = "DesertEaglePreviewOrientation",
-                Position = new Vector3(0.02f, -0.04f, 0.0f),
-                RotationDegrees = new Vector3(0.0f, -90.0f, 0.0f)
-            };
-            root.AddChild(orientation);
-            orientation.AddChild(CombatModelLibrary.InstantiateDesertEagle(firstPerson: false).Root);
-            return true;
-        }
-        catch (Exception exception)
-        {
-            GD.PushError($"Required Desert Eagle inventory model unavailable: {exception.Message}");
-            return false;
-        }
-    }
-
-    private static bool TryBuildAuthoredGsh18(Node3D root)
-    {
-        try
-        {
-            var orientation = new Node3D
-            {
-                Name = "GSh18PreviewOrientation",
-                Position = new Vector3(0.02f, -0.04f, 0.0f),
-                RotationDegrees = new Vector3(0.0f, -90.0f, 0.0f)
-            };
-            root.AddChild(orientation);
-            orientation.AddChild(CombatModelLibrary.InstantiateGsh18(firstPerson: false).Root);
-            return true;
-        }
-        catch (Exception exception)
-        {
-            GD.PushWarning($"GSh-18 inventory model unavailable; using procedural preview: {exception.Message}");
-            return false;
-        }
-    }
-
-    private bool TryBuildAuthoredPlatform(Node3D root, WeaponPlatform platform)
-    {
-        try
+            weaponRoot = CombatModelLibrary.InstantiateDesertEagle(firstPerson: false).Root;
+        else if (platform == WeaponPlatform.GSh18)
+            weaponRoot = CombatModelLibrary.InstantiateGsh18(firstPerson: false).Root;
+        else
         {
             var authored = CombatModelLibrary.InstantiateWeapon(platform, firstPerson: false);
             authored.Configure(_weapon ?? WeaponCatalog.Build(platform, 0));
-            var orientation = new Node3D
-            {
-                Name = $"{platform}PreviewOrientation",
-                Position = new Vector3(0.02f, -0.04f, 0.0f),
-                RotationDegrees = new Vector3(0.0f, -90.0f, 0.0f),
-                Scale = Vector3.One * 1.16f
-            };
-            orientation.AddChild(authored.Root);
-            root.AddChild(orientation);
-            return true;
+            weaponRoot = authored.Root;
         }
-        catch (Exception exception)
+        var orientation = new Node3D
         {
-            GD.PushError($"Required authored {platform} preview unavailable: {exception.Message}");
-            return false;
-        }
+            Name = $"{platform}PreviewOrientation",
+            RotationDegrees = new Vector3(0, -90, 0)
+        };
+        orientation.AddChild(weaponRoot);
+        root.AddChild(orientation);
     }
 
     private void BuildKnife(Node3D root)

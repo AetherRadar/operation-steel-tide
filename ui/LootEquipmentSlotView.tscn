@@ -1,0 +1,67 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://csharp/LootEquipmentSlotView.cs" id="1_slot"]
+
+[node name="LootEquipmentSlotView" type="PanelContainer"]
+clip_contents = true
+offset_right = 160.0
+offset_bottom = 96.0
+mouse_filter = 1
+script = ExtResource("1_slot")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_top = 3
+theme_override_constants/margin_bottom = 3
+
+[node name="Content" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Header" type="HBoxContainer" parent="Margin/Content"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Caption" type="Label" parent="Margin/Content/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
+clip_text = true
+mouse_filter = 2
+
+[node name="Remove" type="Button" parent="Margin/Content/Header"]
+custom_minimum_size = Vector2(22, 20)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "-"
+
+[node name="Body" type="HBoxContainer" parent="Margin/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="IconArea" type="Control" parent="Margin/Content/Body"]
+custom_minimum_size = Vector2(56, 42)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ItemName" type="Label" parent="Margin/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+clip_text = true
+mouse_filter = 1
+
+[node name="Description" type="Label" parent="Margin/Content/Body"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.78, 0.86, 0.83, 1)
+autowrap_mode = 3
+max_lines_visible = 4
+clip_text = true
+mouse_filter = 2

@@ -4,6 +4,11 @@ namespace OperationSteelTide;
 
 public partial class CombatHUD
 {
+    internal bool EquipmentSlotsFitForDiagnostics
+        => _helmetSlot.ContentFits && _armorSlot.ContentFits && _packSlot.ContentFits
+            && _helmetSlot.GetGlobalRect().End.Y <= _armorSlot.GetGlobalRect().Position.Y
+            && _armorSlot.GetGlobalRect().End.Y <= _packSlot.GetGlobalRect().Position.Y;
+    internal string EquipmentLayoutForDiagnostics => _helmetSlot.LayoutDescription + ";" + _armorSlot.LayoutDescription + ";" + _packSlot.LayoutDescription;
     private InventoryModelPreview _lootOperatorPreview = null!;
     private Label _lootOperatorCaption = null!;
 
