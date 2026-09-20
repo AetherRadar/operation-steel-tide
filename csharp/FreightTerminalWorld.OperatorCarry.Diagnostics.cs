@@ -127,7 +127,7 @@ public partial class FreightTerminalWorld
                         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
 
-                        var inspection = visual.InspectRifleCarry(animationName);
+                        var inspection = visual.InspectRifleCarry();
                         var sampleValid = OperatorCarrySampleValid(visualId, inspection, animationName);
                         var muzzleOffset = inspection.WeaponMuzzle - inspection.WeaponRoot;
                         var stockOffset = inspection.WeaponStock - inspection.WeaponRoot;
@@ -405,7 +405,7 @@ public partial class FreightTerminalWorld
                     // The capture path bypasses AuthoredOperatorAnimator, so
                     // explicitly apply the same HY-3D weapon IK used during
                     // gameplay before taking the first frame.
-                    visual.RefreshWeaponPose(animationName);
+                    visual.RefreshWeaponPose();
                     await WaitFrames(30);
                     await WaitFrames(4);
 

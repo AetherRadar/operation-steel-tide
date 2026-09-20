@@ -170,15 +170,12 @@ internal static partial class CombatModelLibrary
             try
             {
                 visual = InstantiatePreviewOperator(visualId);
-                if (visualId != OperatorVisualId.Garrison
-                    && Engine.GetMainLoop() is SceneTree tree)
+                if (Engine.GetMainLoop() is SceneTree tree)
                 {
                     tree.Root.AddChild(visual.Root);
                     visual.FreezePreviewPose();
                 }
-                errors[visualId] = visualId == OperatorVisualId.Garrison
-                    ? 0.0f
-                    : visual.PreviewAlignmentError;
+                errors[visualId] = visual.PreviewAlignmentError;
             }
             catch
             {

@@ -1,4 +1,3 @@
-using System;
 using Godot;
 
 namespace OperationSteelTide;
@@ -22,16 +21,7 @@ public partial class EnemyOperator
         }
     }
 
-    /// <summary>
-    /// Prepare a range target's presentation after the actor has been built.
-    ///
-    /// The live-fire venue intentionally keeps targets visually simple: the base
-    /// authored operator already contains the helmet/vest silhouette, while the
-    /// optional paper-doll overlays are inventory previews with source-space
-    /// offsets.  Attaching those overlays to an animated bone socket makes them
-    /// read as floating crates in-world, so hide them for targets and normalize
-    /// any imported 100x socket scale before solving the rifle.
-    /// </summary>
+    /// <summary>Keep the authored range silhouette unarmed without altering its sockets.</summary>
     internal void PrepareTrainingRangeVisualForDiagnostics()
     {
         if (!UsesAuthoredOperatorForDiagnostics)
@@ -39,23 +29,6 @@ public partial class EnemyOperator
             return;
         }
 
-        HideTrainingRangeEquipmentOverlays();
-        if (CombatModelLibrary.UsesHy3dOperator(OperatorVisual))
-        {
-            NormalizeTrainingRangeAttachmentSockets();
-        }
-
-        // Re-apply the weapon socket after the imported rig scale has been fixed.
-        // Toggling through the back socket forces AuthoredOperatorVisual to recompute
-        // its scale from the now-normalized parent instead of retaining a giant
-        // first-frame value.
-        _authoredOperatorVisual.SetWeaponReadied(false);
-        _authoredOperatorVisual.SetWeaponReadied(true);
-        SetAuthoredCombatPoseForDiagnostics();
-        // Training silhouettes are unarmed targets.  Clear both the authored
-        // rifle socket and the fallback procedural weapon after the combat pose
-        // has been sampled; reactive targets may still move, but they never carry
-        // or fire a weapon in this venue.
         ApplyColdStartUnarmed();
         _authoredOperatorVisual.SetWeaponReadied(false);
         _authoredOperatorVisual.SetWeaponVisible(false);
@@ -69,64 +42,6 @@ public partial class EnemyOperator
             downed: false,
             reviving: false,
             dead: false);
-    }
-
-    private void HideTrainingRangeEquipmentOverlays()
-    {
-        var root = _authoredOperatorVisual.Root;
-        foreach (var child in root.GetChildren())
-        {
-            HideTrainingRangeEquipmentNode(child);
-        }
-    }
-
-    private void HideTrainingRangeEquipmentNode(Node node)
-    {
-        if (node is Node3D node3d
-            && (node.Name.ToString().StartsWith("Equipped", StringComparison.Ordinal)
-                || node.Name.ToString().EndsWith("EquipmentVisual", StringComparison.Ordinal)))
-        {
-            // Range targets are silhouettes, not inventory mannequins.  The
-            // authored base operators already include their clothing/armor, while
-            // detachable paper-doll equipment varies in source bounds and can read
-            // as a large floating crate from the firing line.  Hide every optional
-            // overlay in this mode so only the intended operator and rifle remain.
-            node3d.Visible = false;
-            return;
-        }
-        foreach (var child in node.GetChildren())
-        {
-            HideTrainingRangeEquipmentNode(child);
-        }
-    }
-
-    private void NormalizeTrainingRangeAttachmentSockets()
-    {
-        var root = _authoredOperatorVisual.Root;
-        var socketNames = new[]
-        {
-            "WeaponSocket", "BackWeaponSocket", "HeadSocket", "VestSocket",
-            "BackpackSocket", "TeamPatchSocket"
-        };
-        foreach (var socketName in socketNames)
-        {
-            var socket = root.FindChild(socketName, recursive: true, owned: false) as Node3D;
-            if (socket is null)
-            {
-                continue;
-            }
-
-            var scale = socket.Scale;
-            // Authored bamen/HY-3D exports express socket transforms in centimetres
-            // while their rig is scaled by 0.01.  A normal socket is approximately
-            // unit scale; only repair the unmistakable import error.
-            if (scale.X > 4.0f || scale.X < 0.25f
-                || scale.Y > 4.0f || scale.Y < 0.25f
-                || scale.Z > 4.0f || scale.Z < 0.25f)
-            {
-                socket.Scale = Vector3.One;
-            }
-        }
     }
 
     /// <summary>
@@ -193,13 +108,7 @@ public partial class EnemyOperator
             reviving: false,
             dead: false);
 
-        // Keep the target visibly down on the lane while the looping clip advances.
-        // The animator applies the matching root-height correction; this explicit
-        // call is intentionally idempotent because the range controller invokes it
-        // every frame during the short reset window.
-        // The authored downed clip is already grounded in model space.  Applying a
-        // fixed offset here made some operators float while others sank into the
-        // lane; keep the visual root at the actor's measured floor origin.
+        // The authored downed clip already contains its ground contact.
         _authoredOperatorVisual.Root.Rotation = Vector3.Zero;
         if (IsInstanceValid(_bodyRoot))
         {

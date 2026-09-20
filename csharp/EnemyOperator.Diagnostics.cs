@@ -30,6 +30,8 @@ public partial class EnemyOperator
     internal int LineOfSightProbeCountForDiagnostics { get; private set; }
     internal int ContactShareRequestCountForDiagnostics { get; private set; }
     internal float FireTimerForDiagnostics => _fireTimer;
+    internal float AuthoredDeathDurationForDiagnostics => (float)_authoredOperatorAnimator.DeathAnimationDuration;
+    internal bool AuthoredDeathCompletedForDiagnostics => _authoredOperatorAnimator.DeathPoseCompleted;
 
     internal void ResetCrowdPerformanceCountersForDiagnostics()
     {

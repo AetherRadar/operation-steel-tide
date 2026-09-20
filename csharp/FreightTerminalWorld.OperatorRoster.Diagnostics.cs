@@ -97,12 +97,9 @@ public partial class FreightTerminalWorld
                         && fit.HandSeparation >= 0.13f
                         && fit.MuzzleOffset.Z <= -0.38f
                     : fit.Valid)).ToArray();
-            var usesHy3d = CombatModelLibrary.UsesHy3dOperator(visualId);
             var modelReady = inspection.Loaded
                 && inspection.RequiredNodes
-                && (usesHy3d
-                    ? inspection.MeshCount >= 1 && inspection.MaterialCount >= 1
-                    : inspection.MeshCount >= 4 && inspection.MaterialCount >= 4)
+                && inspection.MeshCount >= 1 && inspection.MaterialCount >= 1
                 && inspection.VertexCount >= 20_000
                 && inspection.TriangleCount is >= 40_000 and <= 105_000
                 && inspection.Size.Y > 0.5f
@@ -117,7 +114,7 @@ public partial class FreightTerminalWorld
                 && previewWeapon;
             rosterModelsReady &= modelReady;
             visualReports.Add(
-                $"{role}:{visualId}:hy3d={usesHy3d}:ok={modelReady}:meshes={inspection.MeshCount}:materials={inspection.MaterialCount}:"
+                $"{role}:{visualId}:ok={modelReady}:meshes={inspection.MeshCount}:materials={inspection.MaterialCount}:"
                 + $"vertices={inspection.VertexCount}:triangles={inspection.TriangleCount}:"
                 + $"animations={animationCount}:preview_static={previewStatic}/{previewWeapon}:"
                 + $"fit={string.Join(',', movementFits)}:"

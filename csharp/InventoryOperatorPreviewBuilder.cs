@@ -12,10 +12,7 @@ internal static class InventoryOperatorPreviewBuilder
         Node3D root,
         OperatorVisualId requestedVisual,
         WeaponBuild? weaponBuild = null,
-        bool staticLoadout = false,
-        EquipmentItem? helmet = null,
-        EquipmentItem? bodyArmor = null,
-        EquipmentItem? backpack = null)
+        bool staticLoadout = false)
     {
         Node3D previewRoot;
         AuthoredPreviewOperatorVisual? previewVisual = null;
@@ -24,10 +21,7 @@ internal static class InventoryOperatorPreviewBuilder
         {
             previewVisual = CombatModelLibrary.InstantiatePreviewOperator(
                 requestedVisual,
-                weaponBuild,
-                helmet,
-                bodyArmor,
-                backpack);
+                weaponBuild);
             previewRoot = previewVisual.Root;
         }
         else
@@ -35,10 +29,7 @@ internal static class InventoryOperatorPreviewBuilder
             var visual = CombatModelLibrary.InstantiateOperator(
                 requestedVisual,
                 weaponBuild: weaponBuild,
-                attachDefaultWeapon: weaponBuild is not null,
-                helmet: helmet,
-                bodyArmor: bodyArmor,
-                backpack: backpack);
+                attachDefaultWeapon: weaponBuild is not null);
             staticVisual = visual;
             visual.AnimationPlayer.Stop();
             visual.ApplyPreviewNeutralPose();

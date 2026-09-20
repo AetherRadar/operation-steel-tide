@@ -22,69 +22,68 @@ internal sealed class AuthoredOperatorAnimator
         "jump_start", "jump_loop", "jump_land", "slide_start", "slide_loop", "slide_exit"
     };
 
-    private static readonly HashSet<string> LoopingAnimations = new(StringComparer.Ordinal)
+    private static readonly string[] PistolAnimations =
     {
-        "idle", "walk", "run", "sprint", "crouch_idle", "crouch_walk",
-        "ready_idle", "ready_walk", "ready_run", "ready_sprint",
-        "ready_crouch_idle", "ready_crouch_walk",
-        "aim_walk", "aim_run", "aim_sprint", "aim_crouch_idle", "aim_crouch_walk",
-        "prone_idle", "prone_crawl", "aim_idle", "downed", "revive_kneel"
+        "pistol_ready_idle", "pistol_ready_walk", "pistol_ready_run", "pistol_ready_sprint",
+        "pistol_ready_crouch_idle", "pistol_ready_crouch_walk",
+        "pistol_aim_idle", "pistol_aim_walk", "pistol_aim_run", "pistol_aim_sprint",
+        "pistol_aim_crouch_idle", "pistol_aim_crouch_walk", "pistol_shoot",
+        "pistol_prone_idle", "pistol_prone_crawl", "pistol_reload"
+    };
+
+    private static readonly string[] RifleProneAnimations = { "rifle_prone_idle", "rifle_prone_crawl" };
+
+    private static readonly HashSet<string> NonLoopingAnimations = new(StringComparer.Ordinal)
+    {
+        "hit", "death", "revived", "shoot", "reload", "melee", "throw", "interact",
+        "pickup", "heal", "jump_start", "jump_land", "slide_start", "slide_exit",
+        "pistol_shoot", "pistol_reload"
     };
 
     private readonly AnimationPlayer _player;
     private readonly AuthoredOperatorVisual _visual;
+    private readonly AuthoredLocomotionSpeeds _locomotionSpeeds;
+    private readonly AuthoredUpperBodyActionPlayer _upperBodyAction;
     private string _current = string.Empty;
     private float _overrideRemaining;
     private float _hitCooldownRemaining;
+    private int _overrideWeaponVersion;
 
     public AuthoredOperatorAnimator(AuthoredOperatorVisual visual)
     {
         _visual = visual;
+        _locomotionSpeeds = new AuthoredLocomotionSpeeds(visual.VisualId);
         _player = visual.AnimationPlayer;
         _player.ProcessMode = Node.ProcessModeEnum.Always;
-        // The owning actors select clips from their deterministic physics
-        // step.  Drive the mixer manually from that same call so the weapon
-        // solver can consume the pose sampled for this tick.  A built-in
-        // Physics callback runs after the CharacterBody3D parent (tree-order),
-        // which would leave RefreshWeaponPose one physics frame behind.
+        // Actors choose and sample their authored clip in the same physics
+        // tick that moves the body, then refresh its authored weapon socket.
         _player.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual;
-        foreach (var name in RequiredAnimations)
+        foreach (var group in new[] { RequiredAnimations, ActionAnimations, PistolAnimations, RifleProneAnimations })
         {
-            if (!_player.HasAnimation(name))
+            foreach (var name in group)
             {
-                throw new InvalidOperationException($"Animated operator is missing action {name}.");
-            }
-            var animation = _player.GetAnimation(name);
-            if (animation is not null)
-            {
-                animation.LoopMode = LoopingAnimations.Contains(name)
-                    ? Animation.LoopModeEnum.Linear
-                    : Animation.LoopModeEnum.None;
+                if (!_player.HasAnimation(name))
+                {
+                    throw new InvalidOperationException($"Animated operator is missing action {name}.");
+                }
+                _player.GetAnimation(name).LoopMode = NonLoopingAnimations.Contains(name)
+                    ? Animation.LoopModeEnum.None
+                    : Animation.LoopModeEnum.Linear;
             }
         }
+        _upperBodyAction = new AuthoredUpperBodyActionPlayer(_player);
+        _player.AnimationFinished += OnAnimationFinished;
         Play("idle", 1.0f, immediate: true);
     }
 
     public string CurrentAnimation => _current;
-    public int AnimationCount => RequiredAnimations.Length + ActionAnimationCount;
+    public int AnimationCount => RequiredAnimations.Length + ActionAnimations.Length + PistolAnimations.Length + RifleProneAnimations.Length;
     public int BaseAnimationCount => RequiredAnimations.Length;
-    public int ActionAnimationCount
-    {
-        get
-        {
-            var count = 0;
-            foreach (var action in ActionAnimations)
-            {
-                if (HasAnimation(action)
-                    || action == "jump_loop" && HasAnimation("jump")
-                    || action == "slide_loop" && HasAnimation("slide"))
-                {
-                    count++;
-                }
-            }
-            return count;
-        }
-    }
+    public int ActionAnimationCount => ActionAnimations.Length;
+    public double DeathAnimationDuration => _player.GetAnimation("death").Length;
+    public bool DeathPoseCompleted { get; private set; }
+    public string UpperBodyAction => _upperBodyAction.CurrentAction;
+    public double UpperBodyActionPosition => _upperBodyAction.CurrentPosition;
     public bool HasAnimation(string name) => _player.HasAnimation(name);
 
     public void Update(
@@ -97,10 +96,29 @@ internal sealed class AuthoredOperatorAnimator
         bool downed,
         bool reviving,
         bool dead,
-        bool airborne = false,
-        bool preferUprightLocomotion = false)
+        bool airborne = false)
     {
         _hitCooldownRemaining = Mathf.Max(0.0f, _hitCooldownRemaining - delta);
+        if (dead || downed || reviving || prone || !weaponReadied)
+        {
+            _upperBodyAction.Cancel();
+        }
+        if (dead || downed || reviving || prone || _overrideWeaponVersion != _visual.WeaponAttachmentVersion)
+        {
+            _overrideRemaining = 0.0f;
+        }
+        if (speed > 0.08f && _current is "shoot" or "pistol_shoot")
+        {
+            // A whole-body standing shot clip must not repeatedly replace
+            // the legs while the actor is still travelling. Keep its authored
+            // recoil on the upper body while the gait resumes underneath.
+            if (_overrideRemaining > 0.0f && !dead && !downed && !reviving && !prone && weaponReadied)
+            {
+                _upperBodyAction.Play("shoot", _visual.UsesPistolCarryPose,
+                    _visual.WeaponAttachmentVersion, _overrideRemaining);
+            }
+            _overrideRemaining = 0.0f;
+        }
         if (_overrideRemaining > 0.0f && !dead && !downed)
         {
             _overrideRemaining = Mathf.Max(0.0f, _overrideRemaining - delta);
@@ -111,7 +129,7 @@ internal sealed class AuthoredOperatorAnimator
             }
         }
 
-        var moving = speed > 0.16f;
+        var moving = speed > 0.08f;
         string next;
         var playbackSpeed = 1.0f;
         if (dead)
@@ -128,110 +146,56 @@ internal sealed class AuthoredOperatorAnimator
         }
         else if (airborne)
         {
-            next = HasAnimation("jump_loop")
-                ? "jump_loop"
-                : HasAnimation("jump_start") ? "jump_start" : "aim_idle";
+            next = "jump_loop";
         }
         else if (prone)
         {
             next = moving ? "prone_crawl" : "prone_idle";
-            playbackSpeed = moving ? Mathf.Clamp(speed / 1.1f, 0.72f, 1.35f) : 1.0f;
+            if (weaponReadied && !_visual.UsesPistolCarryPose)
+            {
+                next = "rifle_" + next;
+            }
+            playbackSpeed = moving ? speed / 1.1f : 1.0f;
         }
         else if (crouched)
         {
-            // A low cover posture is still valid while stationary, but do not
-            // carry its kneeling silhouette into AI travel. The game uses
-            // smooth movement for squad and hostile operators, so use the
-            // upright authored walk/run cycles to keep their eye line level
-            // with the player while their feet continue to animate.
-            next = preferUprightLocomotion && moving
-                ? UprightLocomotionPose(speed, aiming, weaponReadied)
-                : moving
-                ? SelectWeaponPose(aiming, weaponReadied, "aim_crouch_walk", "ready_crouch_walk", "crouch_walk")
-                : SelectWeaponPose(aiming, weaponReadied, "aim_crouch_idle", "ready_crouch_idle", "crouch_idle");
-            playbackSpeed = moving ? Mathf.Clamp(speed / 2.4f, 0.72f, 1.4f) : 1.0f;
+            next = SelectWeaponPose(aiming, weaponReadied, moving ? "crouch_walk" : "crouch_idle");
+            playbackSpeed = moving ? speed / _locomotionSpeeds.ForGait("crouch_walk") : 1.0f;
         }
         else if (!moving)
         {
-            next = SelectWeaponPose(aiming, weaponReadied, "aim_idle", "ready_idle", "idle");
-        }
-        else if (speed >= 4.2f)
-        {
-            // The armed ready/sprint clips use a low single-knee tactical
-            // silhouette. AI operators keep their weapon available while
-            // moving, but use the upright authored walk/run cycles so travel
-            // does not look like a continuous kneel or revive pose.
-            next = preferUprightLocomotion
-                ? UprightLocomotionPose(speed, aiming, weaponReadied)
-                : weaponReadied || aiming
-                ? SelectWeaponPose(aiming, weaponReadied, "aim_sprint", "ready_sprint", "sprint")
-                : "run";
-            // The authored sprint cycles are short in the imported GLB.  The
-            // previous scale left a 4.5–5.5 m/s operator visibly skating
-            // between footfalls, so keep the cycle close to the actual travel
-            // speed instead of letting the root move ahead of the feet.
-            playbackSpeed = weaponReadied || aiming
-                ? Mathf.Clamp(speed / 4.4f, 1.0f, 1.55f)
-                : Mathf.Clamp(speed / 3.2f, 1.0f, 1.65f);
-        }
-        else if (speed >= 2.35f)
-        {
-            next = preferUprightLocomotion
-                ? UprightLocomotionPose(speed, aiming, weaponReadied)
-                : SelectWeaponPose(aiming, weaponReadied, "aim_run", "ready_run", "run");
-            playbackSpeed = Mathf.Clamp(speed / 2.8f, 0.95f, 1.65f);
+            next = SelectWeaponPose(aiming, weaponReadied, "idle");
         }
         else
         {
-            next = preferUprightLocomotion
-                ? UprightLocomotionPose(speed, aiming, weaponReadied)
-                : SelectWeaponPose(aiming, weaponReadied, "aim_walk", "ready_walk", "walk");
-            playbackSpeed = Mathf.Clamp(speed / 1.9f, 0.78f, 1.45f);
+            var gait = speed >= 4.2f ? "sprint" : speed >= 2.35f ? "run" : "walk";
+            next = SelectWeaponPose(aiming, weaponReadied, gait);
+            // Preserve the DCC stride distance: a blocked or slowly moving
+            // actor must not keep taking full-speed steps. Each family uses
+            // the same lower-body cycle for unarmed, rifle, and pistol poses.
+            var authoredSpeed = _locomotionSpeeds.ForGait(gait);
+            playbackSpeed = speed / authoredSpeed;
         }
         Play(next, playbackSpeed);
         AdvanceAndRefresh(delta);
-        ApplyGroundingCorrection();
     }
 
-    private static string SelectWeaponPose(
-        bool aiming,
-        bool weaponReadied,
-        string aimPose,
-        string readyPose,
-        string unarmedPose)
-        => aiming ? aimPose : weaponReadied ? readyPose : unarmedPose;
-
-    private static string UprightLocomotionPose(
-        float speed,
-        bool aiming,
-        bool weaponReadied)
-    {
-        var running = speed >= 2.35f;
-        if (aiming)
-        {
-            return running ? "aim_run" : "aim_walk";
-        }
-
-        if (weaponReadied)
-        {
-            return running ? "ready_run" : "ready_walk";
-        }
-
-        return running ? "run" : "walk";
-    }
+    private static string SelectWeaponPose(bool aiming, bool weaponReadied, string pose)
+        => aiming ? "aim_" + pose : weaponReadied ? "ready_" + pose : pose;
 
     public void SetRestingPose(bool weaponReadied)
     {
         _overrideRemaining = 0.0f;
         _hitCooldownRemaining = 0.0f;
+        _upperBodyAction.Cancel();
         Play(weaponReadied ? "ready_idle" : "idle", 1.0f, immediate: true);
-        _visual.RefreshWeaponPose(weaponReadied ? "ready_idle" : "idle");
-        ApplyGroundingCorrection();
+        _visual.RefreshWeaponPose();
     }
 
     public bool PlayHit()
     {
-        if (_hitCooldownRemaining > 0.0f)
+        if (_hitCooldownRemaining > 0.0f || IsPronePose(_current)
+            || _current is "downed" or "death" or "revive_kneel")
         {
             return false;
         }
@@ -244,75 +208,88 @@ internal sealed class AuthoredOperatorAnimator
     {
         if (!_player.HasAnimation(name))
         {
-            return false;
+            throw new InvalidOperationException($"Animated operator is missing action {name}.");
+        }
+        if (name is "shoot" or "reload" && IsPronePose(_current))
+        {
+            return true;
+        }
+        if (name == "reload" || name == "shoot"
+            && (IsLocomotion(_current) || _current.Contains("crouch_", StringComparison.Ordinal)))
+        {
+            _upperBodyAction.Play(
+                name,
+                _visual.UsesPistolCarryPose,
+                _visual.WeaponAttachmentVersion,
+                Mathf.Max(0.08f, duration));
+            return true;
         }
         _hitCooldownRemaining = 0.0f;
         PlayOverride(name, Mathf.Max(0.08f, duration), playbackSpeed);
         return true;
     }
 
-    public void PlayRevived()
-        => PlayOverride("revived", 1.15f);
+    public void PlayRevived() => PlayOverride("revived", 1.15f);
+
+    private void OnAnimationFinished(StringName name)
+        => DeathPoseCompleted = name == "death";
 
     private void PlayOverride(string name, float duration, float playbackSpeed = 1.0f)
     {
+        _upperBodyAction.Cancel();
+        _overrideWeaponVersion = _visual.WeaponAttachmentVersion;
         _overrideRemaining = duration;
         Play(name, playbackSpeed, immediate: true);
     }
 
+    private static bool IsLocomotion(string name)
+        => name.EndsWith("walk", StringComparison.Ordinal)
+            || name.EndsWith("run", StringComparison.Ordinal)
+            || name.EndsWith("sprint", StringComparison.Ordinal)
+            || name.EndsWith("crawl", StringComparison.Ordinal);
+
+    private static bool IsPronePose(string name)
+        => name.Contains("prone_", StringComparison.Ordinal);
+
     private void Play(string name, float playbackSpeed, bool immediate = false)
     {
-        name = ResolveAnimation(name);
+        if (_visual.UsesPistolCarryPose
+            && (name.StartsWith("ready_", StringComparison.Ordinal)
+                || name.StartsWith("aim_", StringComparison.Ordinal)
+                || name.StartsWith("prone_", StringComparison.Ordinal)
+                || name is "shoot" or "reload"))
+        {
+            name = "pistol_" + name;
+        }
         if (!immediate && _current == name)
         {
             _player.SpeedScale = playbackSpeed;
             return;
         }
+        DeathPoseCompleted = false;
+        var preserveStride = !immediate && IsLocomotion(_current) && IsLocomotion(name);
+        var phase = preserveStride && _player.CurrentAnimationLength > 0.0
+            ? _player.CurrentAnimationPosition / _player.CurrentAnimationLength
+            : 0.0;
         _current = name;
         _player.SpeedScale = playbackSpeed;
         _player.Play(name, immediate ? 0.0 : 0.16);
-        // Play() queues the first key for the next mixer notification.  Apply
-        // that key now because the caller solves the weapon socket in the
-        // same physics step.  This also makes hit/revive overrides switch
-        // without displaying one frame of the previous locomotion pose.
+        if (immediate)
+        {
+            _player.Seek(0.0, update: true);
+        }
         _player.Advance(0.0);
-    }
-
-    private string ResolveAnimation(string name)
-    {
-        if (_player.HasAnimation(name))
+        if (preserveStride)
         {
-            return name;
+            _player.Seek(phase * _player.GetAnimation(name).Length, update: true);
         }
-        if (name is "jump_loop" && _player.HasAnimation("jump"))
-        {
-            return "jump";
-        }
-        if (name is "slide_loop" && _player.HasAnimation("slide"))
-        {
-            return "slide";
-        }
-        return name switch
-        {
-            "jump_start" or "jump_loop" or "jump_land" => "aim_idle",
-            "slide_start" or "slide_loop" or "slide_exit" => "crouch_idle",
-            "shoot" => "aim_idle",
-            "reload" => "ready_idle",
-            "melee" or "throw" or "interact" or "pickup" or "heal" => "idle",
-            _ => "idle"
-        };
     }
 
     private void AdvanceAndRefresh(float delta)
     {
         _player.Advance(Mathf.Max(0.0f, delta));
-        _visual.RefreshWeaponPose(_current);
-    }
-
-    private void ApplyGroundingCorrection()
-    {
-        var position = _visual.Root.Position;
-        position.Y = _visual.GroundingOffsetForCurrentPose;
-        _visual.Root.Position = position;
+        _upperBodyAction.Advance(
+            Mathf.Max(0.0f, delta), _visual.UsesPistolCarryPose, _visual.WeaponAttachmentVersion);
+        _visual.RefreshWeaponPose();
     }
 }

@@ -133,7 +133,6 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private float _repathTimer;
     private float _patrolTimer;
     private float _strafeSign = 1.0f;
-    private float _animationPhase;
     private bool _seekingCover;
     private bool _inCover;
     private Vector3 _coverTarget;
@@ -203,8 +202,6 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
     private StandardMaterial3D _mainMaterial = null!;
     private OmniLight3D _muzzleLight = null!;
     private MeshInstance3D _muzzleBloom = null!;
-    private Node3D _leftLegRig = null!;
-    private Node3D _rightLegRig = null!;
     private Node3D _carriedWeaponRoot = null!;
 
     public override void _Ready()
@@ -484,8 +481,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
         Part(Box(new Vector3(0.33f, 0.46f, 0.19f)), new Vector3(0, 1.2f, 0.2f), armor);
         Part(Box(new Vector3(0.035f, 0.38f, 0.035f)), new Vector3(0.14f, 1.58f, 0.23f), armorEdge, new Vector3(0.08f, 0, 0.04f));
 
-        _leftLegRig = BuildLeg(-0.17f, _mainMaterial, armor, gun);
-        _rightLegRig = BuildLeg(0.17f, _mainMaterial, armor, gun);
+        BuildLeg(-0.17f, _mainMaterial, armor, gun);
+        BuildLeg(0.17f, _mainMaterial, armor, gun);
 
         Part(Capsule(0.12f, 0.48f), new Vector3(-0.34f, 1.29f, -0.04f), fabric, new Vector3(0.66f, 0, -0.16f));
         Part(Capsule(0.12f, 0.48f), new Vector3(0.34f, 1.29f, -0.04f), fabric, new Vector3(0.66f, 0, 0.16f));
@@ -596,7 +593,15 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             // Death is a terminal gameplay state, but its authored clip still
             // needs physics-tick sampling so the body reaches the actual
             // prone-on-ground pose instead of freezing on frame zero.
+            if (_suppressDeathAnimationForTrainingRange)
+            {
+                return;
+            }
             AdvanceDeadAuthoredOperator((float)delta);
+            if (UsesAuthoredOperatorForDiagnostics && _authoredOperatorAnimator.DeathPoseCompleted)
+            {
+                SetPhysicsProcess(false);
+            }
             return;
         }
         if (!GodotObject.IsInstanceValid(Player))
@@ -2126,36 +2131,8 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             UpdateAuthoredStanceCollider();
             return;
         }
-        if (UsesAuthoredOperatorForDiagnostics)
-        {
-            // The authored set has no dedicated jump clip. Holding its armed aim pose
-            // in the air reads as an intentional jump shot and avoids sprinting in place.
-            var locomotionSpeed = IsOnFloor() ? speed : 0.0f;
-            AnimateAuthoredOperator(delta, locomotionSpeed);
-            UpdateAuthoredStanceCollider();
-            return;
-        }
-        if (!IsOnFloor())
-        {
-            speed = 0.0f;
-        }
-        _animationPhase += delta * (4.0f + speed * 1.7f);
-        var coverOffset = IsCrouched ? -0.38f : 0.0f;
-        var position = _bodyRoot.Position;
-        position.Y = Mathf.Lerp(
-            position.Y,
-            coverOffset + Mathf.Sin(_animationPhase * 2.0f) * 0.015f * Mathf.Clamp(speed, 0.0f, 1.0f),
-            delta * 9.0f);
-        _bodyRoot.Position = position;
-        var rotation = _bodyRoot.Rotation;
-        rotation.Z = Mathf.Lerp(
-            rotation.Z,
-            Mathf.Sin(_animationPhase) * 0.018f * Mathf.Clamp(speed, 0.0f, 1.0f),
-            delta * 8.0f);
-        _bodyRoot.Rotation = rotation;
-        var stride = Mathf.Sin(_animationPhase) * 0.34f * Mathf.Clamp(speed / 3.7f, 0.0f, 1.0f);
-        _leftLegRig.Rotation = new Vector3(stride, 0, 0);
-        _rightLegRig.Rotation = new Vector3(-stride, 0, 0);
+        AnimateAuthoredOperator(delta);
+        UpdateAuthoredStanceCollider();
     }
 
     public bool TakeDamage(
@@ -2303,46 +2280,19 @@ public partial class EnemyOperator : CharacterBody3D, ILootSource, IOpenableLoot
             };
             return;
         }
-        if (UsesAuthoredOperatorForDiagnostics)
-        {
-            // The normal animation loop will not run again once IsDead is set,
-            // so stow the weapon before starting the terminal clip.  Leaving
-            // the visual in its readied state also leaves the last arm IK pose
-            // attached to the death animation.
-            _authoredOperatorVisual.SetWeaponReadied(false);
-            _authoredOperatorAnimator.Update(
-                0.0f,
-                0.0f,
-                weaponReadied: false,
-                prone: false,
-                crouched: false,
-                aiming: false,
-                downed: false,
-                reviving: false,
-                dead: true);
-            _deathTween = CreateTween();
-            _deathTween.TweenInterval(1.9f);
-            _deathTween.Finished += () =>
-            {
-                if (IsDead)
-                {
-                    SetPhysicsProcess(false);
-                }
-                _deathTween = null;
-            };
-            return;
-        }
-        _deathTween = CreateTween().SetParallel(true);
-        _deathTween.TweenProperty(_bodyRoot, "rotation:z", _rng.Randf() < 0.5f ? -1.38f : 1.38f, 0.52f)
-            .SetTrans(Tween.TransitionType.Quad);
-        _deathTween.TweenProperty(_bodyRoot, "position:y", 0.18f, 0.52f);
-        _deathTween.Finished += () =>
-        {
-            if (IsDead)
-            {
-                SetPhysicsProcess(false);
-            }
-            _deathTween = null;
-        };
+        // Stow the weapon before the complete authored terminal clip.
+        _authoredOperatorVisual.SetWeaponReadied(false);
+        _authoredOperatorAnimator.Update(
+            0.0f,
+            0.0f,
+            weaponReadied: false,
+            prone: false,
+            crouched: false,
+            aiming: false,
+            downed: false,
+            reviving: false,
+            dead: true);
+        // Stop sampling only after AnimationFinished applies the last key.
+        _deathTween = null;
     }
 }

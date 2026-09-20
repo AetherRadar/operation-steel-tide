@@ -59,8 +59,7 @@ public partial class FreightTerminalWorld
                     downed: false,
                     reviving: false,
                     dead: false,
-                    airborne: false,
-                    preferUprightLocomotion: true);
+                    airborne: false);
                 uprightTransitions.Add(animator.CurrentAnimation);
             }
             Sample(0.0f, false, false, false, false, false, false, false);
@@ -162,19 +161,10 @@ public partial class FreightTerminalWorld
             "ready_walk", "ready_run", "ready_sprint", "aim_walk", "aim_run", "aim_sprint",
             "crouch_idle", "crouch_walk", "ready_crouch_idle", "ready_crouch_walk",
             "aim_crouch_idle", "aim_crouch_walk",
-            "prone_idle", "prone_crawl", "revive_kneel", "downed", "hit",
+            "rifle_prone_idle", "rifle_prone_crawl", "revive_kneel", "downed", "hit",
             "revived", "death"
         };
         var transitionsValid = transitions.SequenceEqual(expected);
-        if (!transitionsValid)
-        {
-            // Unarmed high-speed movement intentionally reuses the upright run
-            // cycle; armed/aiming movement still samples the dedicated sprint
-            // clips. Accept that deterministic unarmed variant here.
-            var unarmedUprightExpected = expected.ToArray();
-            unarmedUprightExpected[5] = "run";
-            transitionsValid = transitions.SequenceEqual(unarmedUprightExpected);
-        }
         var expectedUprightTransitions = new[]
         {
             "walk", "run", "ready_walk", "ready_run", "aim_walk", "aim_run"
@@ -187,9 +177,9 @@ public partial class FreightTerminalWorld
         var readyDistinct = readyIdleFit.WeaponOrigin.DistanceTo(rifleFit.WeaponOrigin) >= 0.005f;
         var readyForwardAligned = Mathf.Abs(readyIdleFit.MuzzleOffset.X) <= 0.16f
             && readyIdleFit.MuzzleOffset.Z <= -0.38f;
-        var actionCoverage = actionCount >= 13 || actionCount == 0;
+        var actionCoverage = actionCount == 13;
         var fingerRigCoverage = fingerBoneCount >= 30;
-        var valid = count >= 25
+        var valid = count == 56
             && sockets
             && actionCoverage
             && fingerRigCoverage

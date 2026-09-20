@@ -261,11 +261,11 @@ public partial class InventoryModelPreview : SubViewportContainer
                 break;
             case InventoryPreviewKind.Operator:
                 BuildOperator(_modelRoot);
-                _camera.Size = _staticLoadoutOperator ? 2.65f : 3.4f;
+                _camera.Size = _staticLoadoutOperator ? 2.65f : 2.48f;
                 _modelRoot.Position = Vector3.Zero;
                 _modelRoot.RotationDegrees = _staticLoadoutOperator
                     ? new Vector3(0, 168, 0)
-                    : new Vector3(0, -9, 0);
+                    : new Vector3(0, 171, 0);
                 _operatorBaseRotation = _modelRoot.Rotation;
                 break;
         }
@@ -353,10 +353,7 @@ public partial class InventoryModelPreview : SubViewportContainer
             root,
             OperatorRoles.Spec(_operatorRole).VisualId,
             _weapon,
-            staticLoadout: _staticLoadoutOperator,
-            helmet: _helmet,
-            bodyArmor: _bodyArmor,
-            backpack: _backpack);
+            staticLoadout: _staticLoadoutOperator);
     }
 
     private void BuildRifle(Node3D root)

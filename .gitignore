@@ -4,6 +4,7 @@
 **/obj/
 
 *.import
+!/assets/models/enemy_operator/enemy_operator.glb.import
 *.blend1
 *.log
 *.pid
@@ -63,6 +64,11 @@ __pycache__/
 /assets/models/hy3d_operators/*.glb
 /assets/models/hy3d_operators/*.png
 /assets/models/hy3d_operators/*.import
+!/assets/models/hy3d_operators/viper.glb.import
+!/assets/models/hy3d_operators/heron.glb.import
+!/assets/models/hy3d_operators/lynx.glb.import
+!/assets/models/hy3d_operators/magpie.glb.import
+!/assets/models/hy3d_operators/jackal.glb.import
 !/assets/models/hy3d_operators/viper.glb
 !/assets/models/hy3d_operators/heron.glb
 !/assets/models/hy3d_operators/lynx.glb

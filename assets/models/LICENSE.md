@@ -1240,8 +1240,9 @@ are not relicensed as MIT:
 - Documentation: https://cloud.tencent.com/document/product/1823/137181
 - Generation/acquisition date: 2026-09-04
 - Local review outputs: `hy3d_operators/{viper,heron,lynx,magpie,jackal}.glb`
-- Conversion: `scripts/blender/build_hy3d_operator.py`, using Tencent's
-  rigged FBX mesh and the CC0 Quaternius 25-action set
+- Initial conversion: `scripts/blender/build_hy3d_operator.py`, using Tencent's
+  rigged FBX mesh and CC0 Quaternius animations. The current DCC correction
+  and export is `scripts/blender/repair_operator_presentation.py`.
 - License/redistribution status: on 2026-09-08 the project owner confirmed
   that the five converted delivery GLBs may be redistributed with this
   repository. The original Tencent responses and rigged FBX files remain in
@@ -1251,18 +1252,27 @@ are not relicensed as MIT:
 - Credentials: never store the Tencent SecretId, token, or API key in this
   repository, logs, or generated metadata.
 
-On 2026-09-19, project contributors manually edited Viper's `preview_stand`
-in Blender 4.5.10 to remove the sideways right-knee bend and backward torso
-lean. This changes the approved output's preview action only; it adds no
-third-party content and does not change its redistribution terms. Source,
-delivery mapping, modification details, and Godot review images are recorded
-in `source_art/hy3d_operators/README.md`; the current GLB hash is recorded in
-`assets/models/hy3d_operators/README.md`.
+The 2026-09-19 correction edits the approved meshes in Blender, separates the
+glove/garment contact where the source surface is fused, and repairs skin
+weights, locomotion, prone poses, and weapon contacts. Lynx retains its original
+hair faces and texture with a dedicated head-parented chain. Its exposed pack
+reuses the approved Heron backpack surface and material. This is an adaptation
+of the existing approved outputs; no new third-party asset is acquired.
 
-The garrison runtime duplicate is rebuilt from the approved Viper GLB by
-`scripts/blender/build_enemy_operator.py`. It retains the authored
-`RifleCarrySocket`, `LeftPalmFrame`, and `RightPalmFrame` contract so runtime
-carry does not apply a second arm solve to the skinned mesh. The 2026-09-12
+On 2026-09-19, project contributors also manually edited Viper's
+`preview_stand` in Blender 4.5.10 to remove the sideways right-knee bend and
+backward torso lean. This changes the approved output's preview action only; it
+adds no third-party content and does not change its redistribution terms.
+Source, delivery mapping, modification details, and Godot review images are
+recorded in `source_art/hy3d_operators/README.md`; the current GLB hash is
+recorded in `assets/models/hy3d_operators/README.md`.
+
+The garrison runtime duplicate is rebuilt from the completed Viper Blender
+source by `scripts/blender/repair_operator_presentation.py -- --roles enemy`.
+It retains the complete authored presentation, action, rifle/handgun socket,
+and palm-frame contract, including `RifleCarrySocket`, `LeftPalmFrame`, and
+`RightPalmFrame` so runtime carry does not apply a second arm solve to the
+skinned mesh. The 2026-09-12
 rebuild is `assets/models/enemy_operator/enemy_operator.glb` (21,699,944 bytes,
 SHA-256 `6A991D6D241BB11D2B1FD70E01674D00D203ACD8CEFE488549CDA5A41CDEC919`)
 with editable source `source_art/combat_models/enemy_operator.blend`

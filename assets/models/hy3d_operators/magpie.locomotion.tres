@@ -1,0 +1,7 @@
+[gd_resource type="Resource" format=3]
+
+[resource]
+metadata/walk = 0.981895
+metadata/run = 3.881201
+metadata/sprint = 3.881199
+metadata/crouch_walk = 0.691781

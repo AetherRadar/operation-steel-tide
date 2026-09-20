@@ -9,6 +9,8 @@ public partial class EnemyOperator
     private AuthoredOperatorAnimator _authoredOperatorAnimator = null!;
     private TideHunterMonsterVisual? _tideHunterMonsterVisual;
     private float _authoredAimHoldRemaining;
+    private Vector3 _authoredPreviousPosition;
+    private bool _authoredPositionSampled;
 
     internal bool UsesAuthoredOperatorForDiagnostics
         => IsInstanceValid(_authoredOperatorVisual?.Root);
@@ -98,8 +100,17 @@ public partial class EnemyOperator
         }
     }
 
-    private void AnimateAuthoredOperator(float delta, float speed)
+    private void AnimateAuthoredOperator(float delta)
     {
+        // Sample net travel after collision and navigation movement. Commanded
+        // velocity can remain nonzero while an operator is blocked by a wall.
+        var displacement = GlobalPosition - _authoredPreviousPosition;
+        _authoredPreviousPosition = GlobalPosition;
+        var horizontalDistance = new Vector2(displacement.X, displacement.Z).Length();
+        var speed = _authoredPositionSampled && delta > 0.0f && horizontalDistance < 1.0f
+            ? horizontalDistance / delta
+            : 0.0f;
+        _authoredPositionSampled = true;
         _authoredAimHoldRemaining = Mathf.Max(0.0f, _authoredAimHoldRemaining - delta);
         var weaponReadied = HasFireablePrimary && !IsDead;
         var target = EngageTargetNode;
@@ -123,8 +134,7 @@ public partial class EnemyOperator
             downed: false,
             reviving: false,
             IsDead,
-            airborne: !IsOnFloor(),
-            preferUprightLocomotion: true);
+            airborne: !IsOnFloor());
     }
 
     private void AdvanceDeadAuthoredOperator(float delta)
@@ -155,10 +165,7 @@ public partial class EnemyOperator
         var authoredOperator = CombatModelLibrary.InstantiateOperator(
             OperatorVisual,
             weaponBuild: HasFireablePrimary ? CarriedWeapon : null,
-            attachDefaultWeapon: false,
-            helmet: EquippedHelmet,
-            bodyArmor: EquippedBodyArmor,
-            backpack: EquippedBackpack);
+            attachDefaultWeapon: false);
 
         _bodyRoot.AddChild(authoredOperator.Root);
         var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);

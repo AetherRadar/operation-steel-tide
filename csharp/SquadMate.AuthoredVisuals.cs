@@ -1,4 +1,3 @@
-using System;
 using Godot;
 
 namespace OperationSteelTide;
@@ -8,6 +7,8 @@ public partial class SquadMate
     private AuthoredOperatorVisual _authoredOperatorVisual = null!;
     private AuthoredOperatorAnimator _authoredOperatorAnimator = null!;
     private float _authoredAimHoldRemaining;
+    private Vector3 _authoredPreviousPosition;
+    private bool _authoredPositionSampled;
     private WeaponPlatform? _authoredCarriedWeaponPlatform;
 
     internal bool UsesAuthoredOperatorForDiagnostics
@@ -28,14 +29,10 @@ public partial class SquadMate
         => new Vector2(Velocity.X, Velocity.Z).LengthSquared() <= 0.0001f
         && (IsBodyBag
             || IsDowned && IsDemolitionEliminatedPoseForDiagnostics
-            || !IsDowned && (!UsesAuthoredOperatorForDiagnostics
-                || AuthoredAnimationForDiagnostics is "idle" or "ready_idle"));
+            || !IsDowned && AuthoredAnimationForDiagnostics is "idle" or "ready_idle" or "pistol_ready_idle");
 
     internal bool IsDemolitionEliminatedPoseForDiagnostics
-        => UsesAuthoredOperatorForDiagnostics
-            ? AuthoredAnimationForDiagnostics is "death" or "downed"
-            : IsInstanceValid(_rig)
-                && Mathf.Abs(Mathf.Abs(_rig.Rotation.X) - Mathf.Pi * 0.5f) <= 0.02f;
+        => AuthoredAnimationForDiagnostics is "death" or "downed";
 
     internal void SetAuthoredMovementPoseForDiagnostics(float speed, bool aiming = false)
     {
@@ -54,8 +51,7 @@ public partial class SquadMate
             aiming,
             downed: false,
             reviving: false,
-            dead: false,
-            preferUprightLocomotion: true);
+            dead: false);
     }
 
     private void HoldAuthoredAimAfterShot()
@@ -66,26 +62,17 @@ public partial class SquadMate
         Velocity = Vector3.Zero;
         _authoredAimHoldRemaining = 0.0f;
         _revivePoseBlend = 0.0f;
-        if (UsesAuthoredOperatorForDiagnostics)
-        {
-            _authoredOperatorVisual.SetWeaponReadied(false);
-            _authoredOperatorAnimator.Update(
-                0.0f,
-                0.0f,
-                weaponReadied: false,
-                prone: false,
-                crouched: false,
-                aiming: false,
-                downed: !ReviveUsed,
-                reviving: false,
-                dead: ReviveUsed);
-            return;
-        }
-
-        _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
-        var rigPosition = _rig.Position;
-        rigPosition.Y = 0.0f;
-        _rig.Position = rigPosition;
+        _authoredOperatorVisual.SetWeaponReadied(false);
+        _authoredOperatorAnimator.Update(
+            0.0f,
+            0.0f,
+            weaponReadied: false,
+            prone: false,
+            crouched: false,
+            aiming: false,
+            downed: !ReviveUsed,
+            reviving: false,
+            dead: ReviveUsed);
     }
 
     internal void SetDemolitionRoundFrozenPose()
@@ -102,22 +89,22 @@ public partial class SquadMate
         }
 
         _authoredAimHoldRemaining = 0.0f;
-        if (UsesAuthoredOperatorForDiagnostics)
-        {
-            var weaponReadied = HasFireablePrimary;
-            _authoredOperatorVisual.SetWeaponReadied(weaponReadied);
-            _authoredOperatorAnimator.SetRestingPose(weaponReadied);
-            return;
-        }
-
-        _rig.Rotation = Vector3.Zero;
-        var rigPosition = _rig.Position;
-        rigPosition.Y = 0.0f;
-        _rig.Position = rigPosition;
+        var weaponReadied = HasFireablePrimary;
+        _authoredOperatorVisual.SetWeaponReadied(weaponReadied);
+        _authoredOperatorAnimator.SetRestingPose(weaponReadied);
     }
 
-    private void AnimateAuthoredOperator(float delta, float speed)
+    private void AnimateAuthoredOperator(float delta)
     {
+        // Sample net travel after collision and navigation movement. Commanded
+        // velocity can remain nonzero while an operator is blocked by a wall.
+        var displacement = GlobalPosition - _authoredPreviousPosition;
+        _authoredPreviousPosition = GlobalPosition;
+        var horizontalDistance = new Vector2(displacement.X, displacement.Z).Length();
+        var speed = _authoredPositionSampled && delta > 0.0f && horizontalDistance < 1.0f
+            ? horizontalDistance / delta
+            : 0.0f;
+        _authoredPositionSampled = true;
         _authoredAimHoldRemaining = Mathf.Max(0.0f, _authoredAimHoldRemaining - delta);
         var weaponReadied = HasFireablePrimary && !IsDowned && _revivePoseBlend <= 0.5f;
         var visibleTargetInRange = _combatTarget is not null
@@ -135,8 +122,7 @@ public partial class SquadMate
             aiming: weaponReadied && (visibleTargetInRange || _authoredAimHoldRemaining > 0.0f),
             downed: IsDowned,
             reviving: _revivePoseBlend > 0.5f,
-            dead: false,
-            preferUprightLocomotion: true);
+            dead: false);
     }
 
     private void AttachAuthoredOperatorVisual()
@@ -144,10 +130,7 @@ public partial class SquadMate
         var authoredOperator = CombatModelLibrary.InstantiateOperator(
             OperatorRoles.Spec(Role).VisualId,
             weaponBuild: HasFireablePrimary ? CarriedWeapon : null,
-            attachDefaultWeapon: false,
-            helmet: EquippedHelmet,
-            bodyArmor: EquippedBodyArmor,
-            backpack: EquippedBackpack);
+            attachDefaultWeapon: false);
         _rig.AddChild(authoredOperator.Root);
         var authoredAnimator = new AuthoredOperatorAnimator(authoredOperator);
         _authoredOperatorVisual = authoredOperator;
@@ -177,10 +160,7 @@ public partial class SquadMate
             replacement = CombatModelLibrary.InstantiateOperator(
                 OperatorRoles.Spec(Role).VisualId,
                 weaponBuild: HasFireablePrimary ? CarriedWeapon : null,
-                attachDefaultWeapon: false,
-                helmet: EquippedHelmet,
-                bodyArmor: EquippedBodyArmor,
-                backpack: EquippedBackpack);
+                attachDefaultWeapon: false);
             _rig.AddChild(replacement.Root);
             replacement.SetTeamColor(OperatorRoles.Spec(Role).Accent);
             replacement.SetWeaponVisible(HasFireablePrimary);
@@ -199,12 +179,10 @@ public partial class SquadMate
                 previousRoot!.Free();
             }
         }
-        catch (Exception exception)
+        catch
         {
             replacement?.Root.Free();
-            GD.PushWarning(
-                $"Authored {CarriedWeapon.Platform} squad weapon unavailable; retaining prior visual: "
-                + exception.Message);
+            throw;
         }
     }
 

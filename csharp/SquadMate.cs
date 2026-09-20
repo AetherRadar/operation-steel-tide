@@ -207,7 +207,6 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
     private float _skillActionTime;
     private float _overdriveTime;
     private float _decisionTimer;
-    private float _animationPhase;
     private bool _skillEffectApplied;
     private float _remoteHealth;
     private bool _remoteDown;
@@ -537,10 +536,6 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
             {
                 Velocity = new Vector3(0.0f, -12.0f, 0.0f);
                 MoveAndSlide();
-            }
-            if (!UsesAuthoredOperatorForDiagnostics)
-            {
-                _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
             }
             AnimateRig(dt);
             UpdateLabel();
@@ -1216,12 +1211,8 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         // Damage can arrive between this mate's physics frames.  Move the
         // authored rifle to the back socket immediately so the downed pose
         // never renders with the previous readied-hand attachment.
-        _authoredOperatorVisual?.SetWeaponReadied(false);
+        _authoredOperatorVisual.SetWeaponReadied(false);
         OnCombatIncapacitated();
-        if (!UsesAuthoredOperatorForDiagnostics)
-        {
-            _rig.Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f);
-        }
         UpdateAuthoredStanceCollider();
         UpdateLabel();
         CommitAuthoritativeRemoteCombatState();
@@ -1256,10 +1247,7 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         CommitAuthoritativeRemoteCombatState();
         ResetMovementProgress();
         _rig.Rotation = Vector3.Zero;
-        if (UsesAuthoredOperatorForDiagnostics)
-        {
-            _authoredOperatorAnimator.PlayRevived();
-        }
+        _authoredOperatorAnimator.PlayRevived();
         UpdateAuthoredStanceCollider();
         UpdateHealthVisual();
         UpdateLabel();
@@ -1443,22 +1431,9 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
 
     private void AnimateRig(float delta)
     {
-        var speed = new Vector2(Velocity.X, Velocity.Z).Length();
         UpdateRevivePose(delta);
-        if (UsesAuthoredOperatorForDiagnostics)
-        {
-            AnimateAuthoredOperator(delta, speed);
-            UpdateAuthoredStanceCollider();
-            UpdateHealthVisual();
-            return;
-        }
-        _animationPhase += delta * (4.0f + speed * 1.5f);
-        if (!IsDowned)
-        {
-            var position = _rig.Position;
-            position.Y = Mathf.Lerp(position.Y, Mathf.Sin(_animationPhase * 2.0f) * 0.012f * Mathf.Clamp(speed, 0.0f, 1.0f), delta * 9.0f);
-            _rig.Position = position;
-        }
+        AnimateAuthoredOperator(delta);
+        UpdateAuthoredStanceCollider();
         UpdateHealthVisual();
     }
 
@@ -1472,18 +1447,6 @@ public partial class SquadMate : CharacterBody3D, ISquadCombatant
         var kneeling = reviveTargetNode is not null && !IsDowned
             && GlobalPosition.DistanceTo(reviveTargetNode.GlobalPosition) < 2.4f;
         _revivePoseBlend = Mathf.MoveToward(_revivePoseBlend, kneeling ? 1.0f : 0.0f, delta * 5.0f);
-        if (!IsInstanceValid(_rig))
-        {
-            return;
-        }
-        if (UsesAuthoredOperatorForDiagnostics)
-        {
-            return;
-        }
-        _rig.Rotation = new Vector3(0.52f * _revivePoseBlend, 0.0f, 0.0f);
-        var position = _rig.Position;
-        position.Y = Mathf.Lerp(position.Y, -0.22f * _revivePoseBlend, delta * 8.0f);
-        _rig.Position = position;
     }
 
     private void UpdateLabel()
