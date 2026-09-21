@@ -44,6 +44,7 @@ public partial class TacticalPlayer
     public void ConfigureRole(OperatorRole role, bool refillHealth = true)
     {
         Role = role;
+        RefreshFirstPersonHandAppearance();
         var spec = OperatorRoles.Spec(role);
         MaxHealth = spec.MaxHealth;
         Health = refillHealth ? MaxHealth : Mathf.Clamp(Health, 1.0f, MaxHealth);

@@ -14,9 +14,9 @@ public partial class TacticalPlayer
     // silhouette.  Keeping this platform-specific avoids making compact SMGs
     // and precision rifles look oversized.
     private static readonly Vector3 Ak47HipWeaponPosition = new(
-        0.28f,
+        0.30f,
         -0.20f,
-        -0.48f);
+        -0.62f);
     private static readonly Vector3 PrecisionRifleHipWeaponPosition = new(
         0.30f,
         -0.29f,
@@ -287,11 +287,11 @@ public partial class TacticalPlayer
         _viewmodelKickback = Mathf.Lerp(
             _viewmodelKickback,
             0.0f,
-            SmoothFactor(14.0f, delta));
+            SmoothFactor(18.0f, delta));
         _viewmodelKickPitch = Mathf.Lerp(
             _viewmodelKickPitch,
             0.0f,
-            SmoothFactor(11.5f, delta));
+            SmoothFactor(15.0f, delta));
         _viewmodelKickRoll = Mathf.Lerp(
             _viewmodelKickRoll,
             0.0f,
@@ -312,9 +312,9 @@ public partial class TacticalPlayer
             * RoleRecoilMultiplier
             * carryScale
             * aimScale;
-        var kickback = _rng.RandfRange(0.072f, 0.088f) * strength;
-        var pitch = _rng.RandfRange(0.036f, 0.048f) * strength;
-        var side = _rng.RandfRange(-0.022f, 0.022f) * strength;
+        var kickback = _rng.RandfRange(0.082f, 0.098f) * strength;
+        var pitch = _rng.RandfRange(0.038f, 0.050f) * strength;
+        var side = _rng.RandfRange(-0.012f, 0.012f) * strength;
         var roll = -side * _rng.RandfRange(0.72f, 1.05f);
         _viewmodelKickback = Mathf.Min(0.24f, _viewmodelKickback + kickback);
         _viewmodelKickPitch = Mathf.Max(-0.20f, _viewmodelKickPitch - pitch);

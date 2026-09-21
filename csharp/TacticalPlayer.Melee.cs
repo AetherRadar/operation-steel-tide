@@ -77,16 +77,9 @@ public partial class TacticalPlayer
         };
         _camera.AddChild(_knifeRoot);
 
-        try
-        {
-            _authoredMelee = CombatModelLibrary.InstantiateMelee(definition);
-            _knifeRoot.AddChild(_authoredMelee.Root);
-            AlignAuthoredMeleeArms(definition, presentation);
-        }
-        catch (Exception exception)
-        {
-            GD.PushError($"Required authored melee presentation unavailable: {exception.Message}");
-        }
+        _authoredMelee = CombatModelLibrary.InstantiateMelee(definition);
+        _knifeRoot.AddChild(_authoredMelee.Root);
+        AlignAuthoredMeleeArms(definition, presentation);
 
         _meleeSwingAudio = new AudioStreamPlayer
         {
@@ -102,7 +95,7 @@ public partial class TacticalPlayer
         KnifeSkinDefinition definition,
         MeleePresentationProfile presentation)
     {
-        _meleeArms = CombatModelLibrary.InstantiateFirstPersonPistolServiceArms();
+        _meleeArms = CombatModelLibrary.InstantiateFirstPersonPistolServiceArms(Role);
         _knifeRoot.AddChild(_meleeArms.Root);
         _meleeArms.RightArm.Transform = Transform3D.Identity;
         _meleeArms.LeftArm.Transform = Transform3D.Identity;

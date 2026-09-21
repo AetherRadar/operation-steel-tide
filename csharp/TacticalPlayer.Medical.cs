@@ -332,15 +332,7 @@ public partial class TacticalPlayer
 
     private void BuildMedicalDevices()
     {
-        try
-        {
-            _fieldUsePresentation = new FirstPersonFieldUsePresentation(_camera);
-        }
-        catch (Exception exception)
-        {
-            _fieldUsePresentation = null;
-            GD.PushWarning($"Authored field-use presentation unavailable: {exception.Message}");
-        }
+        _fieldUsePresentation = new FirstPersonFieldUsePresentation(_camera, Role);
     }
 
     private void CancelFieldUse(bool notify = false)

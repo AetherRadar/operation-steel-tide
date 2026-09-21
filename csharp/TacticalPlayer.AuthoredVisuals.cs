@@ -34,14 +34,10 @@ public partial class TacticalPlayer
     private AuthoredFirstPersonArmsVisual _authoredPistolLargeArms = null!;
     private Transform3D _authoredSmgWeaponBodyReadyTransformInWeaponRoot = Transform3D.Identity;
     private bool _authoredSmgWeaponBodyReadyTransformCaptured;
-    private bool _rifleArmsLoadAttempted;
-    private bool _pistolServiceArmsLoadAttempted;
-    private bool _pistolLargeArmsLoadAttempted;
 
     // Anchors in authored M4A1 (weapon-root local) coordinates.
     private static readonly Vector3 RifleGripAnchor = new(0.0f, -0.15f, -0.05f);
     private static readonly Vector3 RifleForegripAnchor = new(0.0f, -0.17f, -0.58f);
-    private bool _smg45LoadAttempted;
     private AuthoredWeaponVisual? _lastMechanismSyncWeapon;
     private Transform3D _lastMechanismMagazineTransform;
     private Transform3D _lastMechanismSpareMagazineTransform;
@@ -861,14 +857,12 @@ public partial class TacticalPlayer
 
     private void EnsureAuthoredFirstPersonSmg()
     {
-        if (_smg45LoadAttempted || IsInstanceValid(_authoredFirstPersonSmg?.Root))
+        if (IsInstanceValid(_authoredFirstPersonSmg?.Root))
         {
             return;
         }
-        _smg45LoadAttempted = true;
-        try
         {
-            var authoredSmg = CombatModelLibrary.InstantiateFirstPersonSmg45();
+            var authoredSmg = CombatModelLibrary.InstantiateFirstPersonSmg45(Role);
             var inheritedScale = Mathf.Max(0.0001f, _weaponRoot.Scale.X);
             authoredSmg.Root.Scale = Vector3.One * (AuthoredSmgPresentationScale / inheritedScale);
             authoredSmg.Root.Position =
@@ -884,10 +878,6 @@ public partial class TacticalPlayer
                 _weaponRoot.GlobalTransform.AffineInverse()
                 * _authoredFirstPersonSmg.WeaponBody.GlobalTransform;
             _authoredSmgWeaponBodyReadyTransformCaptured = true;
-        }
-        catch (Exception exception)
-        {
-            GD.PushError($"Required authored SMG-45 first-person model unavailable: {exception.Message}");
         }
     }
 
@@ -970,61 +960,35 @@ public partial class TacticalPlayer
 
     private void EnsureAuthoredRifleArms()
     {
-        if (_rifleArmsLoadAttempted || IsInstanceValid(_authoredRifleArms?.Root))
+        if (IsInstanceValid(_authoredRifleArms?.Root))
         {
             return;
         }
-        _rifleArmsLoadAttempted = true;
-        try
-        {
-            var arms = CombatModelLibrary.InstantiateFirstPersonRifleArms();
-            _weaponRoot.AddChild(arms.Root);
-            _authoredRifleArms = arms;
-        }
-        catch (Exception exception)
-        {
-            GD.PushWarning($"Authored rifle arms unavailable; retaining procedural hands: {exception.Message}");
-        }
+        var arms = CombatModelLibrary.InstantiateFirstPersonRifleArms(Role);
+        _weaponRoot.AddChild(arms.Root);
+        _authoredRifleArms = arms;
     }
 
     private void EnsureAuthoredPistolServiceArms()
     {
-        if (_pistolServiceArmsLoadAttempted
-            || IsInstanceValid(_authoredPistolServiceArms?.Root))
+        if (IsInstanceValid(_authoredPistolServiceArms?.Root))
         {
             return;
         }
-        _pistolServiceArmsLoadAttempted = true;
-        try
-        {
-            var arms = CombatModelLibrary.InstantiateFirstPersonPistolServiceArms();
-            _weaponRoot.AddChild(arms.Root);
-            _authoredPistolServiceArms = arms;
-        }
-        catch (Exception exception)
-        {
-            GD.PushWarning($"Authored pistol arms unavailable; retaining procedural hands: {exception.Message}");
-        }
+        var arms = CombatModelLibrary.InstantiateFirstPersonPistolServiceArms(Role);
+        _weaponRoot.AddChild(arms.Root);
+        _authoredPistolServiceArms = arms;
     }
 
     private void EnsureAuthoredPistolLargeArms()
     {
-        if (_pistolLargeArmsLoadAttempted
-            || IsInstanceValid(_authoredPistolLargeArms?.Root))
+        if (IsInstanceValid(_authoredPistolLargeArms?.Root))
         {
             return;
         }
-        _pistolLargeArmsLoadAttempted = true;
-        try
-        {
-            var arms = CombatModelLibrary.InstantiateFirstPersonPistolLargeArms();
-            _weaponRoot.AddChild(arms.Root);
-            _authoredPistolLargeArms = arms;
-        }
-        catch (Exception exception)
-        {
-            GD.PushWarning($"Authored large-pistol arms unavailable; retaining procedural hands: {exception.Message}");
-        }
+        var arms = CombatModelLibrary.InstantiateFirstPersonPistolLargeArms(Role);
+        _weaponRoot.AddChild(arms.Root);
+        _authoredPistolLargeArms = arms;
     }
 
     private AuthoredFirstPersonArmsVisual? ActiveAuthoredArms()

@@ -48,7 +48,7 @@ internal sealed class FirstPersonFieldUsePresentation
     private Transform3D _primaryGripTarget;
     private Transform3D _supportGripTarget;
 
-    public FirstPersonFieldUsePresentation(Node3D camera)
+    public FirstPersonFieldUsePresentation(Node3D camera, OperatorRole role)
     {
         _root = new Node3D
         {
@@ -60,7 +60,7 @@ internal sealed class FirstPersonFieldUsePresentation
 
         _props = CombatModelLibrary.InstantiateFieldUseProps();
         _root.AddChild(_props.Root);
-        _arms = CombatModelLibrary.InstantiateFirstPersonRifleArms();
+        _arms = CombatModelLibrary.InstantiateFirstPersonRifleArms(role);
         _root.AddChild(_arms.Root);
 
         _props.ResetPose();
@@ -85,6 +85,8 @@ internal sealed class FirstPersonFieldUsePresentation
     }
 
     public bool Visible => _root.Visible;
+
+    public void SetRole(OperatorRole role) => FirstPersonHandAppearance.Apply(_arms.Root, role);
 
     public void Present(FirstPersonFieldUsePresentationKind kind, float progress)
     {

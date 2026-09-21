@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace OperationSteelTide;
@@ -31,8 +32,8 @@ public partial class TacticalPlayer
     private Node3D _ladderHandsRoot = null!;
     private Node3D _ladderLeftHand = null!;
     private Node3D _ladderRightHand = null!;
-    private Node3D _ladderLeftForearm = null!;
-    private Node3D _ladderRightForearm = null!;
+    private Vector3 _ladderLeftHandRest;
+    private Vector3 _ladderRightHandRest;
 
     public bool IsClimbingLadder => _isClimbingLadder;
     public bool CanMountLadder => !_isClimbingLadder && Time.GetTicksMsec() >= _ladderRemountBlockedUntil;
@@ -51,34 +52,15 @@ public partial class TacticalPlayer
             Visible = false
         };
         _camera.AddChild(_ladderHandsRoot);
-        var glove = GloveFabric(new Color(0.105f, 0.125f, 0.105f));
-        var armor = Material(new Color(0.025f, 0.032f, 0.029f), 0.18f, 0.76f);
-        _ladderLeftHand = BuildTacticalHand(
-            _ladderHandsRoot,
-            true,
-            new Vector3(-0.24f, -0.04f, -0.04f),
-            new Vector3(-0.22f, -0.08f, -0.12f),
-            glove,
-            armor);
-        _ladderRightHand = BuildTacticalHand(
-            _ladderHandsRoot,
-            false,
-            new Vector3(0.24f, -0.25f, -0.04f),
-            new Vector3(-0.22f, 0.08f, 0.12f),
-            glove,
-            armor);
-        _ladderLeftForearm = BuildSleevedForearm(
-            _ladderHandsRoot,
-            new Vector3(-0.28f, -0.34f, 0.14f),
-            new Vector3(-0.36f, -0.08f, -0.16f),
-            glove,
-            armor);
-        _ladderRightForearm = BuildSleevedForearm(
-            _ladderHandsRoot,
-            new Vector3(0.28f, -0.55f, 0.14f),
-            new Vector3(-0.36f, 0.08f, 0.16f),
-            glove,
-            armor);
+        var scene = GD.Load<PackedScene>("res://assets/models/djmaesen_smg45/hands_ladder.glb")
+            ?? throw new InvalidOperationException("Required authored ladder hands asset is missing.");
+        var authored = scene.Instantiate<Node3D>();
+        _ladderHandsRoot.AddChild(authored);
+        _ladderLeftHand = CombatModelLibrary.RequireNode(authored, "LeftArm");
+        _ladderRightHand = CombatModelLibrary.RequireNode(authored, "RightArm");
+        _ladderLeftHandRest = _ladderLeftHand.Position;
+        _ladderRightHandRest = _ladderRightHand.Position;
+        FirstPersonHandAppearance.Apply(authored, Role);
     }
 
     public bool BeginLadderClimb(
@@ -479,10 +461,8 @@ public partial class TacticalPlayer
         _ladderHandsRoot.Position = _ladderHandsRoot.Position.Lerp(
             new Vector3(0.0f, -0.12f, -0.62f),
             1.0f - Mathf.Exp(-delta * 10.0f));
-        _ladderLeftHand.Position = new Vector3(-0.24f, -0.04f + reach, -0.04f - Mathf.Abs(reach) * 0.3f);
-        _ladderRightHand.Position = new Vector3(0.24f, -0.25f - reach, -0.04f - Mathf.Abs(reach) * 0.3f);
-        _ladderLeftForearm.Position = new Vector3(-0.28f, -0.34f + reach, 0.14f);
-        _ladderRightForearm.Position = new Vector3(0.28f, -0.55f - reach, 0.14f);
+        _ladderLeftHand.Position = _ladderLeftHandRest + new Vector3(0.0f, reach, -Mathf.Abs(reach) * 0.3f);
+        _ladderRightHand.Position = _ladderRightHandRest + new Vector3(0.0f, -reach, -Mathf.Abs(reach) * 0.3f);
         _weaponRoot.Visible = false;
         _knifeRoot.Visible = false;
         _ladderHandsRoot.Visible = true;

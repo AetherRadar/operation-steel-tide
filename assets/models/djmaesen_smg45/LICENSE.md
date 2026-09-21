@@ -134,3 +134,13 @@ near-plane giant-sleeve failure cannot satisfy the build contract. These changes
 preserve the authored materials, skin, and arm hierarchy.
 The original model and all derived geometry remain copyright DJMaesen and are not
 covered by the repository's MIT license.
+
+## 2026-09-21 hands-first presentation
+
+The current runtime hand crops are rebuilt by
+`scripts/blender/build_compact_first_person_hands.py` from the same licensed
+source. `source_art/first_person_hands/` contains the editable Blender sources
+for rifle, pistol, SMG reload, and ladder poses. The pass enlarges glove contact
+surfaces, moves sleeve continuation outside the camera, retains the authored
+grip markers and reload skeleton, and adds five role material variants in
+`hands_palette.glb`. These derivatives remain under DJMaesen's CC BY 4.0 terms.

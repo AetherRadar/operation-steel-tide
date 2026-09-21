@@ -257,12 +257,11 @@ public partial class FreightTerminalWorld
         var previewOperatorGeometry = previewOperator.Loaded
             && previewOperator.RequiredNodes
             && previewOperator.MeshCount >= 1
-            // The Bamen garrison operator is one authored skinned mesh with a
-            // packed material and a 2.55 m paper-doll frame. Its authored
-            // shoulder-and-gear silhouette is wider than the legacy mannequin.
+            // The roster preview uses the delivered human-scale operator.
+            // Its UI camera framing does not change the source geometry.
             && previewOperator.MaterialCount >= 1
-            && previewOperator.Size.X is >= 0.7f and <= 1.7f
-            && previewOperator.Size.Y is >= 2.45f and <= 2.65f
+            && previewOperator.Size.X is >= 0.55f and <= 1.25f
+            && previewOperator.Size.Y is >= 1.75f and <= 2.3f
             && previewOperator.Size.Z is >= 0.35f and <= 0.8f;
         var gsh18Geometry = gsh18.Loaded
             && gsh18.RequiredNodes

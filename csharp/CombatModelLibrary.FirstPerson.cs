@@ -241,10 +241,11 @@ internal static partial class CombatModelLibrary
         "RightGripFrame", "LeftGripFrame"
     };
 
-    public static AuthoredFirstPersonSmgVisual InstantiateFirstPersonSmg45()
+    public static AuthoredFirstPersonSmgVisual InstantiateFirstPersonSmg45(OperatorRole role = OperatorRole.Assault)
     {
         var root = InstantiateRequired(Smg45FirstPersonScenePath, Smg45FirstPersonNodes);
         root.Name = "AuthoredSMG45FirstPersonVisual";
+        FirstPersonHandAppearance.Apply(root, role);
         foreach (var geometry in GeometryBelow(root))
         {
             geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
@@ -252,27 +253,28 @@ internal static partial class CombatModelLibrary
         return new AuthoredFirstPersonSmgVisual(root);
     }
 
-    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonRifleArms()
+    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonRifleArms(OperatorRole role = OperatorRole.Assault)
         => InstantiateStaticFirstPersonArms(
             Smg45RifleArmsScenePath,
-            "AuthoredFirstPersonRifleArmsVisual");
+            "AuthoredFirstPersonRifleArmsVisual", role);
 
-    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonPistolServiceArms()
+    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonPistolServiceArms(OperatorRole role = OperatorRole.Assault)
         => InstantiateStaticFirstPersonArms(
             Smg45PistolServiceArmsScenePath,
-            "AuthoredFirstPersonPistolServiceArmsVisual");
+            "AuthoredFirstPersonPistolServiceArmsVisual", role);
 
-    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonPistolLargeArms()
+    public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonPistolLargeArms(OperatorRole role = OperatorRole.Assault)
         => InstantiateStaticFirstPersonArms(
             Smg45PistolLargeArmsScenePath,
-            "AuthoredFirstPersonPistolLargeArmsVisual");
+            "AuthoredFirstPersonPistolLargeArmsVisual", role);
 
     private static AuthoredFirstPersonArmsVisual InstantiateStaticFirstPersonArms(
         string scenePath,
-        string runtimeName)
+        string runtimeName, OperatorRole role)
     {
         var root = InstantiateRequired(scenePath, StaticFirstPersonArmsNodes);
         root.Name = runtimeName;
+        FirstPersonHandAppearance.Apply(root, role);
         foreach (var geometry in GeometryBelow(root))
         {
             geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
