@@ -12,3 +12,4 @@ source_art/third_party/quaternius_buildings_pack/SOURCE_PAGE.html whitespace=-bl
 source_art/third_party/trey_modular_industrial/ORIGINAL_README.txt whitespace=-blank-at-eol
 source_art/third_party/trey_modular_industrial/SOURCE_PAGE.html whitespace=-blank-at-eol
 source_art/lantern_canal_world/lantern_canal_workshops_v2_5.blend filter=lfs diff=lfs merge=lfs -text
+source_art/first_person_hands/operator_hand_kits.blend filter=lfs diff=lfs merge=lfs -text

@@ -52,15 +52,12 @@ public partial class TacticalPlayer
             Visible = false
         };
         _camera.AddChild(_ladderHandsRoot);
-        var scene = GD.Load<PackedScene>("res://assets/models/djmaesen_smg45/hands_ladder.glb")
-            ?? throw new InvalidOperationException("Required authored ladder hands asset is missing.");
-        var authored = scene.Instantiate<Node3D>();
+        var authored = CombatModelLibrary.InstantiateFirstPersonLadderHands(Role);
         _ladderHandsRoot.AddChild(authored);
-        _ladderLeftHand = CombatModelLibrary.RequireNode(authored, "LeftArm");
-        _ladderRightHand = CombatModelLibrary.RequireNode(authored, "RightArm");
+        _ladderLeftHand = CombatModelLibrary.RequireNodeEnding(authored, "LeftArm");
+        _ladderRightHand = CombatModelLibrary.RequireNodeEnding(authored, "RightArm");
         _ladderLeftHandRest = _ladderLeftHand.Position;
         _ladderRightHandRest = _ladderRightHand.Position;
-        FirstPersonHandAppearance.Apply(authored, Role);
     }
 
     public bool BeginLadderClimb(

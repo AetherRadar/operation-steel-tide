@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace OperationSteelTide;
@@ -10,11 +11,11 @@ internal sealed class AuthoredFirstPersonSmgVisual
     public AuthoredFirstPersonSmgVisual(Node3D root)
     {
         Root = root;
-        Arms = CombatModelLibrary.RequireNode(root, "AuthoredArms");
-        WeaponBody = CombatModelLibrary.RequireNode(root, "WeaponBody");
-        Magazine = CombatModelLibrary.RequireNode(root, "MagazineGeometry");
-        ChargingHandle = CombatModelLibrary.RequireNode(root, "ChargingHandleGeometry");
-        Muzzle = CombatModelLibrary.RequireNode(root, "Muzzle");
+        Arms = CombatModelLibrary.RequireNodeEnding(root, "AuthoredArms");
+        WeaponBody = CombatModelLibrary.RequireNodeEnding(root, "WeaponBody");
+        Magazine = CombatModelLibrary.RequireNodeEnding(root, "MagazineGeometry");
+        ChargingHandle = CombatModelLibrary.RequireNodeEnding(root, "ChargingHandleGeometry");
+        Muzzle = CombatModelLibrary.RequireNodeEnding(root, "Muzzle");
         AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
         Skeleton = CombatModelLibrary.RequireSkeleton(root);
         if (!AnimationPlayer.HasAnimation(ReloadAnimationName)
@@ -169,14 +170,14 @@ internal sealed class AuthoredFirstPersonArmsVisual
     public AuthoredFirstPersonArmsVisual(Node3D root)
     {
         Root = root;
-        RightArm = CombatModelLibrary.RequireNode(root, "RightArm");
-        LeftArm = CombatModelLibrary.RequireNode(root, "LeftArm");
-        RightPalmFrame = CombatModelLibrary.RequireNode(root, "RightPalmFrame");
-        LeftPalmFrame = CombatModelLibrary.RequireNode(root, "LeftPalmFrame");
-        RightWristFrame = CombatModelLibrary.RequireNode(root, "RightWristFrame");
-        LeftWristFrame = CombatModelLibrary.RequireNode(root, "LeftWristFrame");
-        RightGripFrame = CombatModelLibrary.RequireNode(root, "RightGripFrame");
-        LeftGripFrame = CombatModelLibrary.RequireNode(root, "LeftGripFrame");
+        RightArm = CombatModelLibrary.RequireNodeEnding(root, "RightArm");
+        LeftArm = CombatModelLibrary.RequireNodeEnding(root, "LeftArm");
+        RightPalmFrame = CombatModelLibrary.RequireNodeEnding(root, "RightPalmFrame");
+        LeftPalmFrame = CombatModelLibrary.RequireNodeEnding(root, "LeftPalmFrame");
+        RightWristFrame = CombatModelLibrary.RequireNodeEnding(root, "RightWristFrame");
+        LeftWristFrame = CombatModelLibrary.RequireNodeEnding(root, "LeftWristFrame");
+        RightGripFrame = CombatModelLibrary.RequireNodeEnding(root, "RightGripFrame");
+        LeftGripFrame = CombatModelLibrary.RequireNodeEnding(root, "LeftGripFrame");
     }
 
     public Node3D Root { get; }
@@ -227,6 +228,8 @@ internal static partial class CombatModelLibrary
         "res://assets/models/djmaesen_smg45/smg45_pistol_service_arms.glb";
     internal const string Smg45PistolLargeArmsScenePath =
         "res://assets/models/djmaesen_smg45/smg45_pistol_large_arms.glb";
+    internal const string OperatorHandKitsScenePath =
+        "res://assets/models/djmaesen_smg45/operator_hand_kits.glb";
 
     private static readonly string[] Smg45FirstPersonNodes =
     {
@@ -243,9 +246,7 @@ internal static partial class CombatModelLibrary
 
     public static AuthoredFirstPersonSmgVisual InstantiateFirstPersonSmg45(OperatorRole role = OperatorRole.Assault)
     {
-        var root = InstantiateRequired(Smg45FirstPersonScenePath, Smg45FirstPersonNodes);
-        root.Name = "AuthoredSMG45FirstPersonVisual";
-        FirstPersonHandAppearance.Apply(root, role);
+        var root = InstantiateRoleFamily(role, "Smg", "AuthoredSMG45FirstPersonVisual");
         foreach (var geometry in GeometryBelow(root))
         {
             geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
@@ -255,31 +256,145 @@ internal static partial class CombatModelLibrary
 
     public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonRifleArms(OperatorRole role = OperatorRole.Assault)
         => InstantiateStaticFirstPersonArms(
-            Smg45RifleArmsScenePath,
+            "Rifle",
             "AuthoredFirstPersonRifleArmsVisual", role);
 
     public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonPistolServiceArms(OperatorRole role = OperatorRole.Assault)
         => InstantiateStaticFirstPersonArms(
-            Smg45PistolServiceArmsScenePath,
+            "PistolService",
             "AuthoredFirstPersonPistolServiceArmsVisual", role);
 
     public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonPistolLargeArms(OperatorRole role = OperatorRole.Assault)
         => InstantiateStaticFirstPersonArms(
-            Smg45PistolLargeArmsScenePath,
+            "PistolLarge",
             "AuthoredFirstPersonPistolLargeArmsVisual", role);
 
+    internal static Node3D InstantiateFirstPersonLadderHands(OperatorRole role)
+        => InstantiateRoleFamily(role, "Ladder", "AuthoredFirstPersonLadderHandsVisual");
+
     private static AuthoredFirstPersonArmsVisual InstantiateStaticFirstPersonArms(
-        string scenePath,
+        string family,
         string runtimeName, OperatorRole role)
     {
-        var root = InstantiateRequired(scenePath, StaticFirstPersonArmsNodes);
-        root.Name = runtimeName;
-        FirstPersonHandAppearance.Apply(root, role);
+        var root = InstantiateRoleFamily(role, family, runtimeName);
         foreach (var geometry in GeometryBelow(root))
         {
             geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         }
         return new AuthoredFirstPersonArmsVisual(root);
+    }
+
+    internal static Node3D RequireNodeEnding(Node3D root, string ending)
+    {
+        var node = FindNodeEnding(root, ending);
+        return node ?? throw new InvalidOperationException(
+            $"Combat model {root.Name} is missing required node ending {ending}.");
+    }
+
+    private static Node3D InstantiateRoleFamily(
+        OperatorRole role,
+        string family,
+        string runtimeName)
+    {
+        var scene = GD.Load<PackedScene>(OperatorHandKitsScenePath)
+            ?? throw new InvalidOperationException(
+                $"Required operator hand kit is missing: {OperatorHandKitsScenePath}");
+        var kitRoot = scene.Instantiate<Node3D>();
+        var roleRoot = kitRoot.FindChild(RoleKitName(role), recursive: true, owned: false) as Node3D
+            ?? throw new InvalidOperationException(
+                $"Operator hand kit is missing role subtree {role}.");
+        if (family == "Smg")
+        {
+            foreach (var visualName in new[] { "Viper", "Heron", "Lynx", "Magpie", "Jackal" })
+            {
+                if (kitRoot.FindChild(visualName, recursive: true, owned: false)
+                    is Node3D visualRoot)
+                {
+                    var selected = string.Equals(
+                        visualName,
+                        RoleKitName(role),
+                        StringComparison.Ordinal);
+                    visualRoot.Visible = selected;
+                    if (!selected)
+                    {
+                        // Keep the shared AnimationPlayer at the GLB root so
+                        // reload track paths remain valid, while preventing
+                        // inactive role meshes from affecting bounds/cameras.
+                        visualRoot.Scale = Vector3.Zero;
+                    }
+                }
+            }
+            kitRoot.Name = runtimeName;
+            FirstPersonHandAppearance.Apply(kitRoot, role);
+            return kitRoot;
+        }
+        var familyRoot = FindNodeEnding(roleRoot, family)
+            ?? throw new InvalidOperationException(
+                $"Operator hand kit {role} is missing family subtree {family}.");
+        var extracted = new Node3D
+        {
+            Name = runtimeName
+        };
+        familyRoot.Owner = null;
+        familyRoot.GetParent()?.RemoveChild(familyRoot);
+        extracted.AddChild(familyRoot);
+        kitRoot.Free();
+        FirstPersonHandAppearance.Apply(extracted, role);
+        return extracted;
+    }
+
+    private static string RoleKitName(OperatorRole role)
+        => role switch
+        {
+            OperatorRole.Assault => "Viper",
+            OperatorRole.Medic => "Heron",
+            OperatorRole.Recon => "Lynx",
+            OperatorRole.Scavenger => "Magpie",
+            OperatorRole.Locksmith => "Jackal",
+            _ => "Viper"
+        };
+
+    private static Node3D? FindNodeEnding(Node root, string ending)
+    {
+        if (root is Node3D node
+            && node.Visible
+            && IsNodeNameEnding(node.Name.ToString(), ending))
+        {
+            return node;
+        }
+        if (root is Node3D hidden && !hidden.Visible)
+        {
+            return null;
+        }
+        var children = root.GetChildren();
+        using var childrenBacking = children.AsDisposable();
+        foreach (var child in children)
+        {
+            if (FindNodeEnding(child, ending) is { } match)
+            {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    private static bool IsNodeNameEnding(string name, string ending)
+    {
+        if (name.EndsWith(ending, StringComparison.Ordinal))
+        {
+            return true;
+        }
+        var suffixStart = name.LastIndexOf(ending + ".", StringComparison.Ordinal);
+        if (suffixStart < 0)
+        {
+            suffixStart = name.LastIndexOf(ending + "_", StringComparison.Ordinal);
+            if (suffixStart < 0)
+            {
+                return false;
+            }
+        }
+        var numericSuffix = name[(suffixStart + ending.Length + 1)..];
+        return numericSuffix.Length > 0 && numericSuffix.All(char.IsDigit);
     }
 
     public static CombatModelInspection InspectFirstPersonSmg45()
@@ -288,12 +403,13 @@ internal static partial class CombatModelLibrary
         try
         {
             root = InstantiateFirstPersonSmg45().Root;
-            var bounds = ComputeBounds(root);
+            var inspectedRoot = FindNodeEnding(root, "Smg") ?? root;
+            var bounds = ComputeBounds(inspectedRoot);
             return new CombatModelInspection(
                 true,
                 true,
                 bounds.MeshCount,
-                CountMaterials(root),
+                CountMaterials(inspectedRoot),
                 bounds.Size);
         }
         catch (Exception)

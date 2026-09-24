@@ -144,3 +144,38 @@ for rifle, pistol, SMG reload, and ladder poses. The pass enlarges glove contact
 surfaces, moves sleeve continuation outside the camera, retains the authored
 grip markers and reload skeleton, and adds five role material variants in
 `hands_palette.glb`. These derivatives remain under DJMaesen's CC BY 4.0 terms.
+
+## 2026-09-24 role-specific operator hand kits
+
+The role-specific first-person hand kits are Blender-authored derivatives of
+the same DJMaesen arms source. They retain the licensed hand mesh, materials,
+skin/animation contracts, and authored grip markers while adding five
+role-specific sleeve, cuff, glove-proportion, and ladder-hand variants:
+`Viper`, `Heron`, `Lynx`, `Magpie`, and `Jackal`. Each role contains
+`Rifle`, `PistolService`, `PistolLarge`, `Smg`, and `Ladder` families. Runtime
+selects one authored role subtree; C# does not reshape or recolor the mesh.
+
+- Editable source: `../../source_art/first_person_hands/operator_hand_kits.blend`
+- Runtime output: `operator_hand_kits.glb` and its six embedded PNG sidecars
+- Reproducible builder: `../../scripts/blender/build_operator_hand_kits.py`
+- Build/review date: 2026-09-24
+- Required attribution remains: **"fps animated smg" by DJMaesen, licensed
+  under CC BY 4.0.** The derivative must retain the source link, license link,
+  and this role-specific modification notice.
+
+| Role-kit file | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Runtime `operator_hand_kits.glb` | 32,993,860 | `A15D8B3D364A077DA1403A500D7A3B5F096A3E725C2960B62C1B5C91C6AFC042` |
+| Texture `operator_hand_kits_Image_0.png` | 1,913,243 | `3BC291E07FA1E04DC5CEE727297D7051966A8D8AC39FCCE622BFB7DC408CB002` |
+| Texture `operator_hand_kits_Image_1.png` | 3,561,679 | `92CF1397C106CF721902A676985E82253CEC6E526DBD25510BD4E8B8685EEEA1` |
+| Texture `operator_hand_kits_Image_2.png` | 3,527,986 | `ADD5B1429F735916033AE45BD755B6A6DA70A9EBD047EED38F78C7D64A967F08` |
+| Texture `operator_hand_kits_Image_3.png` | 3,087,805 | `413215D813112D2E1A21FCDDF198A7573E43B57B82B51DD3F6C031B8454A4C41` |
+| Texture `operator_hand_kits_Image_4.png` | 5,531,678 | `2E32C5BA120A0B9B32B2F08409164A1EA0A40CE7EB2F71CE4371F28A84A5405B` |
+| Texture `operator_hand_kits_Image_5.png` | 2,889,977 | `8C80453448135822B1F5518CB28E927027ED815A21FC5FF5F4C143E7A93438EF` |
+| DCC source `../../source_art/first_person_hands/operator_hand_kits.blend` | 349,721,688 | `DB614150317AA7B79E7AB538D17128C6C691ACCD0A4C04221A587F9674C20EBD` |
+| Builder `../../scripts/blender/build_operator_hand_kits.py` | 12,912 | `1CBA616A61943A37C728A8E6D745D31DEBA51D6B3C633D3881A3203A2245CFF6` |
+
+The source and every derived role kit remain copyright DJMaesen and are not
+covered by the repository's MIT license. Project-authored deformation code and
+the role-selection adapter remain MIT-covered repository code, subject to the
+AI-assisted DCC disclosure in `docs/CONTENT_PROVENANCE.md`.

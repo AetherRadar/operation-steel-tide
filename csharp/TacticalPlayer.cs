@@ -1829,7 +1829,7 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _leanValue = Mathf.Lerp(_leanValue, _slideTime <= 0.0f ? leanInput : 0.0f, SmoothFactor(9.0f, delta));
         _head.Rotation = new Vector3(
             _pitch + _recoilPitch + _damageKickPitch,
-            _recoilSide * 0.32f,
+            _recoilSide * 0.44f,
             _recoilSide * 0.24f + _leanValue * 0.13f + _damageKickRoll);
 
         var horizontalSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
