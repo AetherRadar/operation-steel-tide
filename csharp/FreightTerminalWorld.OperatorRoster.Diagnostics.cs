@@ -198,6 +198,46 @@ public partial class FreightTerminalWorld
             && locksmithPassive <= 0.79f
             && locksmithActive <= 0.26f;
 
+        var savedRosterWeapon = _player.EquippedWeapon.Clone();
+        var savedRosterRole = _player.Role;
+        var smgOpticMounted = false;
+        var smgRoleRefresh = false;
+        var smgRoleRefreshRecovered = false;
+        try
+        {
+            _player.GrantFireablePrimaryForDiagnostics(
+                WeaponCatalog.Build(WeaponPlatform.M3A1, 0));
+            smgOpticMounted = _player.InspectSmgOpticAttachmentForDiagnostics() is
+                {
+                    Available: true,
+                    MountedToWeaponBody: true
+                };
+            _player.ConfigureRole(OperatorRole.Recon);
+            var refreshedSmgOptic = _player.InspectSmgOpticAttachmentForDiagnostics();
+            smgRoleRefresh = _player.WeaponHandPoseValidForDiagnostics
+                && refreshedSmgOptic.Available
+                && refreshedSmgOptic.MountedToWeaponBody;
+        }
+        catch (Exception exception)
+        {
+            GD.PushError($"SMG optic role refresh diagnostic failed: {exception}");
+        }
+        finally
+        {
+            try
+            {
+                _player.GrantFireablePrimaryForDiagnostics(savedRosterWeapon);
+                _player.ConfigureRole(savedRosterRole);
+                smgRoleRefreshRecovered = _player.EquippedWeapon.Platform
+                        == savedRosterWeapon.Platform
+                    && _player.WeaponHandPoseValidForDiagnostics;
+            }
+            catch (Exception exception)
+            {
+                GD.PushError($"SMG optic role refresh restore failed: {exception}");
+            }
+        }
+
         var singleSelectionReady = true;
         foreach (var role in roles)
         {
@@ -220,6 +260,9 @@ public partial class FreightTerminalWorld
             && rivalRosterRules
             && lootSkillReady
             && locksmithReady
+            && smgOpticMounted
+            && smgRoleRefresh
+            && smgRoleRefreshRecovered
             && uiReady;
         GD.Print(
             $"OPERATOR_ROSTER_CHECK roles={roles.Length} identity={identityReady} localization={localizationReady} "
@@ -231,6 +274,8 @@ public partial class FreightTerminalWorld
             + $"scavenger_capacity={scavengerCapacity}/{assaultCapacity} scavenger_search={scavengerSearch:F2} "
             + $"loot_revealed={LastOperatorLootScanForDiagnostics.RevealedCount} loot_value={LastOperatorLootScanForDiagnostics.TotalValue} "
             + $"locksmith_search={locksmithPassive:F2}/{locksmithActive:F2} "
+            + $"smg_optic_mounted={smgOpticMounted} smg_role_refresh={smgRoleRefresh} "
+            + $"smg_role_refresh_recovered={smgRoleRefreshRecovered} "
             + $"ui_cards={_hud.OperatorRoleCardCountForDiagnostics} ui_single={singleSelectionReady} "
             + $"ui_pressed={_hud.SelectedOperatorRoleCardCountForDiagnostics} "
             + $"ui_tag={_hud.VisibleOperatorRoleSelectionTagCountForDiagnostics} "

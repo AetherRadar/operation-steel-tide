@@ -20,6 +20,7 @@ public partial class TacticalPlayer
         if (_authoredFirstPersonSmg is { } smg
             && GodotObject.IsInstanceValid(smg.Root))
         {
+            DetachOpticFromAuthoredSmgBeforeFree(smg.Root);
             var oldRoot = smg.Root;
             oldRoot.GetParent()?.RemoveChild(oldRoot);
             oldRoot.Free();

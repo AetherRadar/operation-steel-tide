@@ -703,6 +703,7 @@ public partial class TacticalPlayer
 
     private void RefreshAuthoredPrimaryWeapon()
     {
+        EnsureAuthoredOpticAnchor();
         var useAuthoredM4 = EquippedWeapon.Platform == WeaponPlatform.M4A1;
         var wantsAuthoredSmg = EquippedWeapon.Platform == WeaponPlatform.M3A1;
         var useAuthoredSmg = wantsAuthoredSmg;
@@ -893,6 +894,7 @@ public partial class TacticalPlayer
 
     private void PrepareOpticParentForCurrentWeapon()
     {
+        EnsureAuthoredOpticAnchor();
         if (!IsInstanceValid(_opticRoot) || !IsInstanceValid(_weaponRoot))
         {
             return;
@@ -912,6 +914,12 @@ public partial class TacticalPlayer
 
     private void SetOpticReadyTransformInWeaponRoot(Vector3 position)
     {
+        EnsureAuthoredOpticAnchor();
+        if (!IsInstanceValid(_opticRoot) || !IsInstanceValid(_weaponRoot))
+        {
+            throw new InvalidOperationException(
+                "First-person optic anchor was not available after rebuilding.");
+        }
         var readyTransformInWeaponRoot = new Transform3D(Basis.Identity, position);
         if (EquippedWeapon.Platform == WeaponPlatform.M3A1
             && _authoredSmgWeaponBodyReadyTransformCaptured
@@ -931,6 +939,48 @@ public partial class TacticalPlayer
         }
 
         _opticRoot.GlobalTransform = _weaponRoot.GlobalTransform * readyTransformInWeaponRoot;
+    }
+
+    private void DetachOpticFromAuthoredSmgBeforeFree(Node3D smgRoot)
+    {
+        if (!IsInstanceValid(smgRoot)
+            || !IsInstanceValid(_opticRoot)
+            || !IsInstanceValid(_weaponRoot)
+            || !smgRoot.IsAncestorOf(_opticRoot))
+        {
+            return;
+        }
+
+        _opticRoot.Reparent(_weaponRoot, keepGlobalTransform: true);
+    }
+
+    private void EnsureAuthoredOpticAnchor()
+    {
+        if (IsInstanceValid(_opticRoot)
+            && IsInstanceValid(_opticReticle)
+            && IsInstanceValid(_authoredOptics?.Root))
+        {
+            return;
+        }
+        if (!IsInstanceValid(_weaponRoot))
+        {
+            throw new InvalidOperationException(
+                "Cannot rebuild first-person optic anchor before the weapon root exists.");
+        }
+
+        if (IsInstanceValid(_opticRoot))
+        {
+            var staleParent = _opticRoot.GetParent();
+            if (staleParent is not null && IsInstanceValid(staleParent))
+            {
+                staleParent.RemoveChild(_opticRoot);
+            }
+            _opticRoot.Free();
+        }
+        _opticRoot = null!;
+        _opticReticle = null!;
+        _authoredOptics = null!;
+        BuildOpticAnchor();
     }
 
     private void EnsureAuthoredPlatformWeapon(WeaponPlatform platform)
