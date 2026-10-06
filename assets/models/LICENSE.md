@@ -1333,6 +1333,11 @@ animated smg** by **DJMaesen**:
   sidearm magazine grasps and platform-specific slide manipulation were rebuilt
   on 2026-09-01. Both runtime meshes were then rebuilt as left-only support-arm
   crops, with visible magazine props driven directly by the animated hand.
+- The role-specific Blender hand-kit derivative was rebuilt on 2026-10-06.
+  Long-gun reload presentation now renders one authored left support-hand crop
+  beside the weapon-specific static right firing hand; the complete arms remain
+  audit-only. Sidearms continue to use their existing static hand path and are
+  intentionally outside this long-gun presentation pass.
 - Required attribution: **"fps animated smg" by DJMaesen, licensed under CC BY
   4.0.** Indicate that Operation Steel Tide removed the visible SMG, baked the
   authored frame-155 two-hand pose as the bind pose, and added platform-specific
@@ -1344,9 +1349,8 @@ left-only long-gun crop with a 28 source-unit elbow-length cuff, and one
 4,667-triangle left-only pistol crop with a 16 source-unit compact cuff. All
 three meshes share the original armature/skin, materials, UVs, and normalized
 skin weights. Runtime renders the moving support-arm crop beside the
-weapon-specific static firing arm; a geometry-free compatibility node retains the
-legacy `ReloadArmsMesh` diagnostic name while the complete audit mesh remains
-hidden. The GLB also retains three
+weapon-specific static firing arm; the complete audit mesh remains hidden and
+runtime does not require a full-arm compatibility node. The GLB also retains three
 embedded PNG images and 24 tactical/empty reload clips across twelve profiles.
 Both shoulder roots and the right palm-to-grip relation remain fixed; only the
 left arm is present in the runtime reload layer. `LeftSidearmMagazineAnchorFrame` is attached to

@@ -288,8 +288,15 @@ public partial class FreightTerminalWorld
             && firstPersonSmgReload.Duration is >= 2.4f and <= 2.9f
             && firstPersonSmgReload.SupportArmRotation >= 0.2f
             && firstPersonSmgReload.MagazineTravel >= 0.12f
-            && firstPersonSmgReload.ArmBoundsSize.Z >= 0.04f
-            && firstPersonSmgReload.ArmBoundsSize.Y >= 0.0069f
+            // The imported hand kit keeps the source-unit root contract
+            // (0.015 scale). Validate the compact visible crop at that
+            // contract's actual bounds instead of requiring the retired
+            // full-forearm silhouette.
+            && firstPersonSmgReload.ArmBoundsSize.X >= 0.010f
+            && firstPersonSmgReload.ArmBoundsSize.Z >= 0.006f
+            && firstPersonSmgReload.ArmBoundsSize.Y >= 0.003f
+            && firstPersonSmgReload.ArmBoundsSize.Z <= 0.020f
+            && firstPersonSmgReload.ArmBoundsSize.Y <= 0.010f
             && firstPersonSmgReload.WeaponBoundsSize.Z >= 1.22f;
         var playerAuthored = _player.UsesAuthoredPrimaryWeaponForDiagnostics;
         var playerAuthoredAttachments = _player.AuthoredM4AttachmentPresentationValidForDiagnostics;
@@ -615,6 +622,79 @@ public partial class FreightTerminalWorld
                     + $"weapon_rotation_travel={weaponRotationTravel:0.000000}");
                 GD.Print($"SMG_OPTIC_RELOAD_PASS valid={smgOpticFollowsReload}");
                 _player.ClearReloadPoseForDiagnostics();
+            }
+            if (platform is WeaponPlatform.M4A1
+                or WeaponPlatform.AK74)
+            {
+                var reloadSamples = new[]
+                {
+                    (Progress: 0.25f, Name: "extract"),
+                    (Progress: 0.66f, Name: "insert")
+                };
+                foreach (var sample in reloadSamples)
+                {
+                    var reloadPath =
+                        $"res://first_person_{platform.ToString().ToLowerInvariant()}_reload_{sample.Name}_validation.png";
+                    var reloadAbsolutePath = ProjectSettings.GlobalizePath(reloadPath);
+                    if (System.IO.File.Exists(reloadAbsolutePath))
+                    {
+                        System.IO.File.Delete(reloadAbsolutePath);
+                    }
+
+                    var reloadPose = _player.SetReloadPoseForDiagnostics(
+                        sample.Progress);
+                    await WaitFrames(2);
+                    var reloadInspection =
+                        _player.InspectAllWeaponReloadForDiagnostics();
+                    var readable = sample.Name == "extract"
+                        ? reloadInspection.ScreenContact.ExtractionReadable
+                        : reloadInspection.ScreenContact.InsertionReadable;
+                    var reloadValid = reloadPose
+                        && reloadInspection.Reloading
+                        && reloadInspection.AnimatedRootActive
+                        && reloadInspection.AnimatedMeshActive
+                        && reloadInspection.StaticArmsActive
+                        && reloadInspection.WeaponActive
+                        && reloadInspection.ClipExists
+                        && reloadInspection.RigMarkersAvailable
+                        && reloadInspection.SeparateMagazineNodes
+                        && readable
+                        && reloadInspection.BodyContinuity.LeftArm.BodyEdgeConnected;
+                    GD.Print(
+                        $"FIRST_PERSON_RELOAD_SCREEN platform={platform} "
+                        + $"stage={sample.Name} "
+                        + $"left_palm={reloadInspection.ScreenContact.LeftPalmScreen} "
+                        + $"left_palm_y={reloadInspection.ScreenContact.LeftPalmYRatio:F3} "
+                        + $"left_palm_behind={reloadInspection.ScreenContact.LeftPalmBehindCamera} "
+                        + $"primary_grip={reloadInspection.ScreenContact.PrimaryMagazineGripScreen} "
+                        + $"primary_grip_behind={reloadInspection.ScreenContact.PrimaryMagazineGripBehindCamera} "
+                        + $"primary_bounds={reloadInspection.ScreenContact.PrimaryMagazineScreen.Bounds} "
+                        + $"spare_grip={reloadInspection.ScreenContact.SpareMagazineGripScreen} "
+                        + $"spare_grip_behind={reloadInspection.ScreenContact.SpareMagazineGripBehindCamera} "
+                        + $"spare_bounds={reloadInspection.ScreenContact.SpareMagazineScreen.Bounds} "
+                        + $"readable={readable}");
+                    SaveViewportImage(reloadPath);
+                    captures[platform] &= reloadValid
+                        && System.IO.File.Exists(reloadAbsolutePath)
+                        && new System.IO.FileInfo(reloadAbsolutePath).Length > 0;
+                    GD.Print(
+                        $"FIRST_PERSON_RELOAD_CHECK platform={platform} "
+                        + $"stage={sample.Name} valid={reloadValid} "
+                        + $"clip={reloadInspection.ClipName} "
+                        + $"progress={reloadInspection.Progress:F3} "
+                        + $"animated={reloadInspection.AnimatedRootActive}/"
+                        + $"{reloadInspection.AnimatedMeshActive} "
+                        + $"static={reloadInspection.StaticArmsActive} "
+                        + $"magazines={reloadInspection.PrimaryMagazineVisible}/"
+                        + $"{reloadInspection.SpareMagazineVisible} "
+                        + $"readable={readable} "
+                        + $"body_edge={reloadInspection.BodyContinuity.LeftArm.BodyEdgeConnected}");
+                    GD.Print(
+                        $"FIRST_PERSON_RELOAD_PASS platform={platform} "
+                        + $"stage={sample.Name} valid={reloadValid}");
+                    _player.ClearReloadPoseForDiagnostics();
+                    await WaitFrames(2);
+                }
             }
             var instanceId = _player.AuthoredWeaponInstanceIdForDiagnostics(platform);
             if (instanceId != 0)

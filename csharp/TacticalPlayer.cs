@@ -238,7 +238,12 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private Node3D _weaponRoot = null!;
     private Marker3D _muzzle = null!;
     private OmniLight3D _muzzleFlash = null!;
+    private SpotLight3D _muzzleFlashBeam = null!;
     private MeshInstance3D _muzzleBloom = null!;
+    private MeshInstance3D _muzzleFlashSideLeft = null!;
+    private MeshInstance3D _muzzleFlashSideRight = null!;
+    private MeshInstance3D _muzzleFlashTop = null!;
+    private Tween? _muzzleFlashTween;
     private MeshInstance3D _opticReticle = null!;
     private SpotLight3D _weaponLight = null!;
     private MeshInstance3D _magazine = null!;
@@ -270,9 +275,11 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
     private AudioStreamPlayer3D _footstepAudio = null!;
     private CollisionShape3D _collider = null!;
     private readonly RandomNumberGenerator _rng = new();
+    private readonly RandomNumberGenerator _muzzleFlashRng = new();
     public override void _Ready()
     {
         _rng.Randomize();
+        _muzzleFlashRng.Randomize();
         CollisionLayer = 1;
         CollisionMask = 1 | 2 | BreakableGlassField.MovementCollisionLayer;
         // Thin stair treads (~0.13 m rise); generous snap helps the capsule mount each step.
@@ -565,6 +572,21 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         Rings = 8
     };
 
+    private static CylinderMesh MuzzleFlashCone(
+        float length,
+        float baseRadius,
+        float tipRadius)
+        => new()
+        {
+            Height = length,
+            BottomRadius = baseRadius,
+            TopRadius = tipRadius,
+            RadialSegments = 8,
+            Rings = 1,
+            CapBottom = true,
+            CapTop = true
+        };
+
     private static MeshInstance3D MeshPart(
         Node3D parent,
         Mesh mesh,
@@ -642,29 +664,88 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         {
             LightColor = new Color(1.0f, 0.49f, 0.18f),
             LightEnergy = 0.0f,
-            OmniRange = 5.0f,
+            OmniRange = 4.2f,
             ShadowEnabled = false
         };
         _muzzle.AddChild(_muzzleFlash);
+        _muzzleFlashBeam = new SpotLight3D
+        {
+            Name = "MuzzleFlashBeam",
+            LightColor = new Color(1.0f, 0.34f, 0.08f),
+            LightEnergy = 0.0f,
+            SpotRange = 2.4f,
+            SpotAngle = 42.0f,
+            SpotAttenuation = 1.8f,
+            ShadowEnabled = false
+        };
+        _muzzle.AddChild(_muzzleFlashBeam);
 
+        var muzzleCoreMaterial = new StandardMaterial3D
+        {
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+            AlbedoColor = new Color(1.0f, 0.48f, 0.08f, 0.96f),
+            EmissionEnabled = true,
+            Emission = new Color(1.0f, 0.18f, 0.015f),
+            EmissionEnergyMultiplier = 11.0f,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled
+        };
+        var muzzleSideMaterial = new StandardMaterial3D
+        {
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+            AlbedoColor = new Color(1.0f, 0.25f, 0.025f, 0.82f),
+            EmissionEnabled = true,
+            Emission = new Color(1.0f, 0.07f, 0.005f),
+            EmissionEnergyMultiplier = 8.0f,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled
+        };
         _muzzleBloom = new MeshInstance3D
         {
-            Mesh = new SphereMesh { Radius = 0.075f, Height = 0.34f, RadialSegments = 8, Rings = 4 },
-            Rotation = new Vector3(Mathf.Pi / 2, 0, 0),
+            Name = "MuzzleFlashCore",
+            Mesh = MuzzleFlashCone(0.24f, 0.062f, 0.004f),
+            Rotation = new Vector3(-Mathf.Pi / 2, 0, 0),
             Position = new Vector3(0, 0, -0.12f),
-            MaterialOverride = new StandardMaterial3D
-            {
-                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                AlbedoColor = new Color(1.0f, 0.31f, 0.035f, 0.92f),
-                EmissionEnabled = true,
-                Emission = new Color(1.0f, 0.12f, 0.01f),
-                EmissionEnergyMultiplier = 8.0f
-            },
+            MaterialOverride = muzzleCoreMaterial,
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
             Visible = false
         };
         _muzzle.AddChild(_muzzleBloom);
+        _muzzleFlashSideLeft = new MeshInstance3D
+        {
+            Name = "MuzzleFlashSideLeft",
+            Mesh = MuzzleFlashCone(0.15f, 0.034f, 0.002f),
+            Rotation = new Vector3(-Mathf.Pi / 2, 0, -0.55f),
+            Position = new Vector3(-0.014f, -0.004f, -0.075f),
+            MaterialOverride = muzzleSideMaterial,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            Visible = false
+        };
+        _muzzle.AddChild(_muzzleFlashSideLeft);
+        _muzzleFlashSideRight = new MeshInstance3D
+        {
+            Name = "MuzzleFlashSideRight",
+            Mesh = MuzzleFlashCone(0.15f, 0.034f, 0.002f),
+            Rotation = new Vector3(-Mathf.Pi / 2, 0, 0.55f),
+            Position = new Vector3(0.014f, -0.004f, -0.075f),
+            MaterialOverride = muzzleSideMaterial,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            Visible = false
+        };
+        _muzzle.AddChild(_muzzleFlashSideRight);
+        _muzzleFlashTop = new MeshInstance3D
+        {
+            Name = "MuzzleFlashTop",
+            Mesh = MuzzleFlashCone(0.11f, 0.026f, 0.001f),
+            Rotation = new Vector3(-Mathf.Pi / 2, 0, 0),
+            Position = new Vector3(0, 0.018f, -0.055f),
+            MaterialOverride = muzzleSideMaterial,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            Visible = false
+        };
+        _muzzle.AddChild(_muzzleFlashTop);
 
         _weaponLight = new SpotLight3D
         {
@@ -1945,26 +2026,69 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
             15.0f,
             Mathf.Clamp((shotImpact - 0.7f) / 1.2f, 0.0f, 1.0f))
             * suppressedFlash;
+        _muzzleFlashBeam.LightEnergy = Mathf.Lerp(
+            3.8f,
+            7.2f,
+            Mathf.Clamp((shotImpact - 0.7f) / 1.2f, 0.0f, 1.0f))
+            * suppressedFlash;
         _muzzleBloom.Visible = true;
-        _muzzleBloom.Scale = Vector3.One
-            * _rng.RandfRange(1.02f, 1.32f)
-            * Mathf.Lerp(1.0f, 1.44f, Mathf.Clamp(shotImpact - 0.65f, 0.0f, 1.0f))
-            * Mathf.Lerp(0.72f, 1.0f, suppressedFlash);
-        var bloomRotation = _muzzleBloom.Rotation;
-        bloomRotation.Z = _rng.RandfRange(0.0f, Mathf.Tau);
-        _muzzleBloom.Rotation = bloomRotation;
-        var flashTween = CreateTween();
+        _muzzleFlashSideLeft.Visible = true;
+        _muzzleFlashSideRight.Visible = true;
+        _muzzleFlashTop.Visible = true;
+        var flashScale = _muzzleFlashRng.RandfRange(0.92f, 1.18f)
+            * Mathf.Lerp(
+                1.0f,
+                1.32f,
+                Mathf.Clamp(shotImpact - 0.65f, 0.0f, 1.0f))
+            * Mathf.Lerp(0.68f, 1.0f, suppressedFlash);
+        _muzzleBloom.Scale = Vector3.One * flashScale;
+        _muzzleFlashSideLeft.Scale = Vector3.One
+            * flashScale
+            * _muzzleFlashRng.RandfRange(0.82f, 1.08f);
+        _muzzleFlashSideRight.Scale = Vector3.One
+            * flashScale
+            * _muzzleFlashRng.RandfRange(0.82f, 1.08f);
+        _muzzleFlashTop.Scale = Vector3.One
+            * flashScale
+            * _muzzleFlashRng.RandfRange(0.72f, 0.98f);
+        var flashRoll = _muzzleFlashRng.RandfRange(0.0f, Mathf.Tau);
+        SetMuzzleFlashRoll(_muzzleBloom, flashRoll);
+        SetMuzzleFlashRoll(_muzzleFlashSideLeft, flashRoll);
+        SetMuzzleFlashRoll(_muzzleFlashSideRight, flashRoll);
+        SetMuzzleFlashRoll(_muzzleFlashTop, flashRoll);
+        _muzzleFlashTween?.Kill();
+        _muzzleFlashTween = CreateTween();
         var flashDuration = Mathf.Lerp(
-            0.038f,
-            0.055f,
+            0.032f,
+            0.050f,
             Mathf.Clamp(shotImpact - 0.7f, 0.0f, 1.0f));
-        flashTween.TweenProperty(_muzzleFlash, "light_energy", 0.0f, flashDuration);
-        flashTween.Parallel().TweenProperty(
+        _muzzleFlashTween.TweenProperty(_muzzleFlash, "light_energy", 0.0f, flashDuration);
+        _muzzleFlashTween.Parallel().TweenProperty(
+            _muzzleFlashBeam,
+            "light_energy",
+            0.0f,
+            flashDuration * 0.82f);
+        _muzzleFlashTween.Parallel().TweenProperty(
             _muzzleBloom,
             "scale",
-            Vector3.One * 0.15f,
-            flashDuration + 0.018f);
-        flashTween.TweenCallback(Callable.From(() => _muzzleBloom.Visible = false));
+            Vector3.One * 0.10f,
+            flashDuration + 0.014f);
+        _muzzleFlashTween.Parallel().TweenProperty(
+            _muzzleFlashSideLeft,
+            "scale",
+            Vector3.One * 0.08f,
+            flashDuration * 0.78f);
+        _muzzleFlashTween.Parallel().TweenProperty(
+            _muzzleFlashSideRight,
+            "scale",
+            Vector3.One * 0.08f,
+            flashDuration * 0.78f);
+        _muzzleFlashTween.Parallel().TweenProperty(
+            _muzzleFlashTop,
+            "scale",
+            Vector3.One * 0.08f,
+            flashDuration * 0.70f);
+        _muzzleFlashTween.TweenCallback(Callable.From(HideMuzzleFlash));
 
         var authoritativeView = CaptureAuthoritativeViewTransform();
         var shellVelocity = authoritativeView.Basis.X * 3.0f
@@ -2137,6 +2261,24 @@ public partial class TacticalPlayer : CharacterBody3D, ISquadCombatant
         _glassBreakAudio.Stop();
         _glassBreakAudio.PitchScale = _rng.RandfRange(0.96f, 1.04f);
         _glassBreakAudio.Play();
+    }
+
+    private static void SetMuzzleFlashRoll(
+        MeshInstance3D flash,
+        float roll)
+    {
+        var rotation = flash.Rotation;
+        rotation.Z = roll;
+        flash.Rotation = rotation;
+    }
+
+    private void HideMuzzleFlash()
+    {
+        _muzzleBloom.Visible = false;
+        _muzzleFlashSideLeft.Visible = false;
+        _muzzleFlashSideRight.Visible = false;
+        _muzzleFlashTop.Visible = false;
+        _muzzleFlashTween = null;
     }
 
     private void StartReload()

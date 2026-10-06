@@ -1,19 +1,18 @@
-"""Build role-specific first-person hand kits from the authored DJMaesen poses.
+"""Build role-specific first-person hand kits from authored DJMaesen poses.
 
-The source hands remain the licensed production mesh. This pass creates five
-Blender-authored shape variants, shortens the visible sleeve, adds a subtle
-role-specific cuff treatment, and exports one scene containing all role kits.
-Runtime selects one role subtree; it never reshapes the hands in C#.
+The visible first-person model keeps the production glove and finger mesh, but
+only retains a short cuff behind each wrist. The cut is authored and capped in
+Blender so the runtime never repairs or reshapes the visible mesh.
 
 Run with Blender 4.5+:
-    blender --background --factory-startup --python scripts/blender/build_operator_hand_kits.py --python-exit-code 2
+    blender --background --factory-startup --python-exit-code 2 --python scripts/blender/build_operator_hand_kits.py
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 
+import bmesh
 import bpy
 from mathutils import Vector
 
@@ -25,46 +24,41 @@ OUT_GLB = OUTPUT_DIR / "operator_hand_kits.glb"
 
 ROLE_SPECS = {
     "Viper": {
-        "sleeve_length": 0.72,
-        "cuff_width": 0.93,
-        "glove_width": 1.03,
-        "glove_depth": 1.00,
+        "cuff_length": 0.105,
+        "sleeve_inflate": 1.10,
+        "glove_scale": 1.10,
         "sleeve": (0.18, 0.22, 0.25),
         "glove": (0.08, 0.10, 0.09),
         "band": (0.32, 0.39, 0.23),
     },
     "Heron": {
-        "sleeve_length": 0.68,
-        "cuff_width": 0.91,
-        "glove_width": 0.98,
-        "glove_depth": 1.03,
+        "cuff_length": 0.100,
+        "sleeve_inflate": 1.08,
+        "glove_scale": 1.08,
         "sleeve": (0.31, 0.42, 0.43),
         "glove": (0.16, 0.22, 0.21),
         "band": (0.67, 0.82, 0.80),
     },
     "Lynx": {
-        "sleeve_length": 0.76,
-        "cuff_width": 0.88,
-        "glove_width": 0.94,
-        "glove_depth": 0.97,
+        "cuff_length": 0.108,
+        "sleeve_inflate": 1.09,
+        "glove_scale": 1.09,
         "sleeve": (0.19, 0.24, 0.20),
         "glove": (0.11, 0.14, 0.12),
         "band": (0.36, 0.47, 0.27),
     },
     "Magpie": {
-        "sleeve_length": 0.64,
-        "cuff_width": 0.98,
-        "glove_width": 1.08,
-        "glove_depth": 1.05,
+        "cuff_length": 0.098,
+        "sleeve_inflate": 1.12,
+        "glove_scale": 1.12,
         "sleeve": (0.34, 0.27, 0.16),
         "glove": (0.20, 0.15, 0.10),
         "band": (0.53, 0.41, 0.22),
     },
     "Jackal": {
-        "sleeve_length": 0.70,
-        "cuff_width": 0.90,
-        "glove_width": 1.01,
-        "glove_depth": 0.98,
+        "cuff_length": 0.102,
+        "sleeve_inflate": 1.09,
+        "glove_scale": 1.09,
         "sleeve": (0.12, 0.14, 0.15),
         "glove": (0.07, 0.08, 0.08),
         "band": (0.38, 0.42, 0.42),
@@ -76,6 +70,32 @@ FAMILY_SOURCES = {
     "PistolService": OUTPUT_DIR / "smg45_pistol_service_arms.glb",
     "PistolLarge": OUTPUT_DIR / "smg45_pistol_large_arms.glb",
     "Smg": OUTPUT_DIR / "smg45_first_person.glb",
+    "Reload": OUTPUT_DIR / "animated_reload_arms.glb",
+}
+
+CAP_EPSILON = 0.00045
+REMOVE_DOUBLES_EPSILON = 0.0001
+HAND_BONES = {
+    "L_palm_015",
+    "L_thumb1_04", "L_thumb2_05", "L_thumb3_00",
+    "L_point1_07", "L_point2_08", "L_point3_09",
+    "L_middle1_011", "L_middle2_012", "L_middle3_013",
+    "L_ring1_016", "L_ring2_017", "L_ring3_018",
+    "L_pink1_020", "L_pink2_021", "L_pink3_022",
+    "R_palm_039",
+    "R_thumb1_028", "R_thumb2_029", "R_thumb3_030",
+    "R_point1_031", "R_point2_032", "R_point3_033",
+    "R_middle1_034", "R_middle2_035", "R_middle3_036",
+    "R_ring1_037", "R_ring2_038", "R_ring3_040",
+    "R_pink1_041", "R_pink2_042", "R_pink3_043",
+}
+ARMATURE_BONES = {
+    "L_arm_01",
+    "L_elbow_02",
+    "L_wrist_03",
+    "R_arm_024",
+    "R_elbow_025",
+    "R_wrist_026",
 }
 
 
@@ -107,14 +127,20 @@ def find_object(root: bpy.types.Object, name: str) -> bpy.types.Object:
 
 
 def imported_root(family: str, imported: set[bpy.types.Object]) -> bpy.types.Object:
-    expected = "DJMaesenSMG45FirstPerson" if family == "Smg" else "StaticFirstPersonArms"
+    expected = {
+        "Smg": "DJMaesenSMG45FirstPerson",
+        "Reload": "WeaponRoot",
+    }.get(family, "StaticFirstPersonArms")
     for candidate in imported:
         if candidate.name == expected or candidate.name.startswith(expected + "."):
             return candidate
     raise RuntimeError(f"Imported asset is missing {expected}")
 
 
-def remove_import_noise(root: bpy.types.Object, imported: set[bpy.types.Object]) -> None:
+def remove_import_noise(
+    root: bpy.types.Object,
+    imported: set[bpy.types.Object],
+) -> None:
     keep = set(descendants(root))
     for obj in list(imported):
         if obj not in keep and obj.name in bpy.data.objects:
@@ -129,9 +155,16 @@ def copy_material(
 ) -> bpy.types.Material:
     material = original.copy()
     material.name = name
+    if material.node_tree is None:
+        return material
     nodes = material.node_tree.nodes
     links = material.node_tree.links
-    bsdf = next(node for node in nodes if node.type == "BSDF_PRINCIPLED")
+    bsdf = next(
+        (node for node in nodes if node.type == "BSDF_PRINCIPLED"),
+        None,
+    )
+    if bsdf is None:
+        return material
     base_color = bsdf.inputs["Base Color"]
     if base_color.links:
         source_socket = base_color.links[0].from_socket
@@ -155,11 +188,25 @@ def material_variant(
     role: str,
     mesh: bpy.types.Object,
     spec: dict[str, object],
+    glove_polygons: set[int] | None = None,
 ) -> None:
-    if not hasattr(mesh.data, "materials") or len(mesh.data.materials) < 2:
+    if not hasattr(mesh.data, "materials") or not mesh.data.materials:
         return
+    if glove_polygons is None:
+        if len(mesh.data.materials) < 2:
+            glove_polygons = set()
+        else:
+            glove_polygons = {
+                polygon.index
+                for polygon in mesh.data.polygons
+                if polygon.material_index != 0
+            }
     sleeve_source = mesh.data.materials[0]
-    glove_source = mesh.data.materials[1]
+    glove_source = (
+        mesh.data.materials[1]
+        if len(mesh.data.materials) > 1
+        else sleeve_source
+    )
     mesh.data.materials.clear()
     mesh.data.materials.append(
         copy_material(
@@ -185,9 +232,248 @@ def material_variant(
             0.46,
         )
     )
+    for polygon in mesh.data.polygons:
+        polygon.material_index = 1 if polygon.index in glove_polygons else 0
 
 
-def mesh_vertex_material_indices(mesh: bpy.types.Mesh) -> tuple[set[int], set[int]]:
+def smoothstep(value: float) -> float:
+    value = max(0.0, min(1.0, value))
+    return value * value * (3.0 - 2.0 * value)
+
+
+def soften_normals(mesh: bpy.types.Object) -> None:
+    for polygon in mesh.data.polygons:
+        polygon.use_smooth = True
+    if any(modifier.type == "WEIGHTED_NORMAL" for modifier in mesh.modifiers):
+        return
+    modifier = mesh.modifiers.new("AuthoredHandWeightedNormals", "WEIGHTED_NORMAL")
+    modifier.keep_sharp = True
+    modifier.weight = 45
+
+
+def vertex_group_weights(
+    mesh: bpy.types.Object,
+) -> dict[int, float]:
+    group_names = {
+        group.index: group.name
+        for group in mesh.vertex_groups
+    }
+    weights: dict[int, float] = {}
+    for vertex in mesh.data.vertices:
+        weights[vertex.index] = sum(
+            assignment.weight
+            for assignment in vertex.groups
+            if group_names.get(assignment.group) in HAND_BONES
+        )
+    return weights
+
+
+def weighted_glove_polygons(
+    mesh: bpy.types.Object,
+    threshold: float = 0.30,
+) -> set[int]:
+    hand_weights = vertex_group_weights(mesh)
+    return {
+        polygon.index
+        for polygon in mesh.data.polygons
+        if sum(
+            hand_weights.get(vertex_index, 0.0)
+            for vertex_index in polygon.vertices
+        ) / max(1, len(polygon.vertices)) >= threshold
+    }
+
+
+def connected_components(bm: bmesh.types.BMesh) -> list[set[bmesh.types.BMVert]]:
+    bm.verts.ensure_lookup_table()
+    unseen = set(bm.verts)
+    components: list[set[bmesh.types.BMVert]] = []
+    while unseen:
+        seed = min(unseen, key=lambda vertex: vertex.index)
+        unseen.remove(seed)
+        component = {seed}
+        stack = [seed]
+        while stack:
+            vertex = stack.pop()
+            for edge in vertex.link_edges:
+                neighbor = edge.other_vert(vertex)
+                if neighbor in unseen:
+                    unseen.remove(neighbor)
+                    component.add(neighbor)
+                    stack.append(neighbor)
+        components.append(component)
+    return components
+
+
+def ordered_boundary_loops(
+    edges: list[bmesh.types.BMEdge],
+) -> list[list[bmesh.types.BMVert]]:
+    adjacency: dict[bmesh.types.BMVert, list[bmesh.types.BMVert]] = {}
+    for edge in edges:
+        left, right = edge.verts
+        adjacency.setdefault(left, []).append(right)
+        adjacency.setdefault(right, []).append(left)
+    remaining = {
+        (min(left.index, right.index), max(left.index, right.index)): (left, right)
+        for left, neighbors in adjacency.items()
+        for right in neighbors
+    }
+    loops: list[list[bmesh.types.BMVert]] = []
+    while remaining:
+        _, (start, current) = min(remaining.items())
+        remaining.pop((min(start.index, current.index), max(start.index, current.index)))
+        loop = [start, current]
+        previous = start
+        closed = False
+        while True:
+            choices = [
+                neighbor
+                for neighbor in adjacency[current]
+                if neighbor is not previous
+                and (
+                    min(current.index, neighbor.index),
+                    max(current.index, neighbor.index),
+                )
+                in remaining
+            ]
+            if not choices:
+                break
+            next_vertex = min(choices, key=lambda vertex: vertex.index)
+            remaining.pop(
+                (
+                    min(current.index, next_vertex.index),
+                    max(current.index, next_vertex.index),
+                )
+            )
+            if next_vertex is start:
+                closed = True
+                break
+            loop.append(next_vertex)
+            previous, current = current, next_vertex
+        if closed and len(loop) >= 3:
+            loops.append(loop)
+    return loops
+
+
+def cap_cut_loops(
+    bm: bmesh.types.BMesh,
+    plane_co: Vector,
+    plane_no: Vector,
+    material_index: int = 0,
+) -> int:
+    boundary = [
+        edge
+        for edge in bm.edges
+        if len(edge.link_faces) == 1
+        and all(
+            abs((vertex.co - plane_co).dot(plane_no)) <= CAP_EPSILON
+            for vertex in edge.verts
+        )
+    ]
+    caps: list[bmesh.types.BMFace] = []
+    for loop in ordered_boundary_loops(boundary):
+        try:
+            face = bm.faces.new(loop)
+        except ValueError:
+            continue
+        face.material_index = material_index
+        face.smooth = True
+        caps.append(face)
+    if caps:
+        bmesh.ops.triangulate(
+            bm,
+            faces=caps,
+            quad_method="BEAUTY",
+            ngon_method="BEAUTY",
+        )
+    return len(caps)
+
+
+def trim_mesh_to_wrist(
+    mesh: bpy.types.Object,
+    wrist: Vector,
+    palm: Vector,
+    cuff_length: float,
+) -> None:
+    inverse = mesh.matrix_world.inverted()
+    axis_world = (palm - wrist).normalized()
+    plane_world = wrist - axis_world * cuff_length
+    plane_co = inverse @ plane_world
+    plane_no = (inverse.to_3x3() @ axis_world).normalized()
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh.data)
+        geometry = list(bm.verts) + list(bm.edges) + list(bm.faces)
+        bmesh.ops.bisect_plane(
+            bm,
+            geom=geometry,
+            plane_co=plane_co,
+            plane_no=plane_no,
+            dist=0.00001,
+            clear_inner=True,
+            clear_outer=False,
+        )
+        bmesh.ops.remove_doubles(
+            bm,
+            verts=list(bm.verts),
+            dist=REMOVE_DOUBLES_EPSILON,
+        )
+        bm.verts.ensure_lookup_table()
+        bm.edges.ensure_lookup_table()
+        bm.faces.ensure_lookup_table()
+        caps = cap_cut_loops(bm, plane_co, plane_no)
+        if caps == 0:
+            raise RuntimeError(
+                f"{mesh.name} wrist crop did not produce a closed cuff cap"
+            )
+        bm.normal_update()
+        bm.to_mesh(mesh.data)
+        mesh.data.update()
+    finally:
+        bm.free()
+
+
+def shape_static_arm(
+    mesh: bpy.types.Object,
+    wrist: Vector,
+    palm: Vector,
+    spec: dict[str, object],
+    role: str,
+) -> None:
+    sleeve_vertices, glove_vertices = mesh_vertex_material_indices(mesh.data)
+    if not sleeve_vertices or not glove_vertices:
+        raise RuntimeError(f"{mesh.name} lost its sleeve/glove material split")
+    axis = (palm - wrist).normalized()
+    inverse = mesh.matrix_world.inverted()
+    glove_scale = float(spec["glove_scale"])
+    sleeve_inflate = float(spec["sleeve_inflate"])
+    cuff_length = float(spec["cuff_length"])
+    for vertex in mesh.data.vertices:
+        point = mesh.matrix_world @ vertex.co
+        if vertex.index in sleeve_vertices:
+            offset = point - wrist
+            along = axis * offset.dot(axis)
+            radial = offset - along
+            distance_from_wrist = max(0.0, -offset.dot(axis))
+            cuff_blend = smoothstep(
+                distance_from_wrist / max(cuff_length, 0.001)
+            )
+            radius_scale = 1.07 + (sleeve_inflate - 1.07) * cuff_blend
+            point = wrist + along + radial * radius_scale
+        else:
+            hand_offset = point - palm
+            hand_axis = axis * hand_offset.dot(axis)
+            hand_radial = hand_offset - hand_axis
+            point = palm + hand_axis * 1.06 + hand_radial * glove_scale
+        vertex.co = inverse @ point
+    mesh.data.update()
+    material_variant(role, mesh, spec)
+    assign_cuff_band(mesh, wrist, axis, cuff_length)
+    soften_normals(mesh)
+
+
+def mesh_vertex_material_indices(
+    mesh: bpy.types.Mesh,
+) -> tuple[set[int], set[int]]:
     sleeve: set[int] = set()
     glove: set[int] = set()
     for polygon in mesh.polygons:
@@ -196,57 +482,50 @@ def mesh_vertex_material_indices(mesh: bpy.types.Mesh) -> tuple[set[int], set[in
     return sleeve, glove
 
 
-def deform_static_arms(root: bpy.types.Object, role: str) -> None:
-    spec = ROLE_SPECS[role]
-    for side in ("Left", "Right"):
-        mesh = find_object(root, f"{side}ArmMesh")
-        palm = find_object(root, f"{side}PalmFrame").matrix_world.translation
-        wrist = find_object(root, f"{side}WristFrame").matrix_world.translation
-        sleeve_vertices, _ = mesh_vertex_material_indices(mesh.data)
-        sleeve_points = [
-            mesh.matrix_world @ mesh.data.vertices[index].co
-            for index in sleeve_vertices
-        ]
-        sleeve_center = sum(sleeve_points, Vector()) / max(1, len(sleeve_points))
-        sleeve_axis = sleeve_center - wrist
-        if sleeve_axis.length < 0.001:
-            sleeve_axis = Vector((0.0, -1.0, 0.0))
-        sleeve_axis.normalize()
-        inverse = mesh.matrix_world.inverted()
-        for vertex in mesh.data.vertices:
-            point = mesh.matrix_world @ vertex.co
-            offset = point - wrist
-            along = sleeve_axis * offset.dot(sleeve_axis)
-            radial = offset - along
-            if vertex.index in sleeve_vertices:
-                point = wrist + along * float(spec["sleeve_length"]) + radial * float(spec["cuff_width"])
-            else:
-                hand_offset = point - palm
-                point = palm + Vector((
-                    hand_offset.x * float(spec["glove_width"]),
-                    hand_offset.y * float(spec["glove_depth"]),
-                    hand_offset.z * float(spec["glove_depth"]),
-                ))
-            vertex.co = inverse @ point
-        mesh.data.update()
-        material_variant(role, mesh, spec)
-        assign_cuff_band(mesh, wrist)
-
-
-def assign_cuff_band(mesh: bpy.types.Object, wrist: Vector) -> None:
+def assign_cuff_band(
+    mesh: bpy.types.Object,
+    wrist: Vector,
+    axis: Vector,
+    cuff_length: float,
+) -> None:
     if len(mesh.data.materials) < 3:
         return
     for polygon in mesh.data.polygons:
         center = mesh.matrix_world @ polygon.center
-        if (center - wrist).length <= 0.045:
+        along = (center - wrist).dot(axis)
+        if -cuff_length <= along <= -cuff_length * 0.46:
             polygon.material_index = 2
 
 
+def deform_static_arms(root: bpy.types.Object, role: str) -> None:
+    spec = dict(ROLE_SPECS[role])
+    for side in ("Left", "Right"):
+        mesh = find_object(root, f"{side}ArmMesh")
+        wrist = find_object(root, f"{side}WristFrame").matrix_world.translation
+        palm = find_object(root, f"{side}PalmFrame").matrix_world.translation
+        trim_mesh_to_wrist(
+            mesh,
+            wrist,
+            palm,
+            float(spec["cuff_length"]),
+        )
+        shape_static_arm(mesh, wrist, palm, spec, role)
+
+
 def deform_animated_smg(root: bpy.types.Object, role: str) -> None:
-    """Keep the animation rig intact; use a compact authored sleeve/material variant."""
-    spec = ROLE_SPECS[role]
+    spec = dict(ROLE_SPECS[role])
     arms = find_object(root, "AuthoredArms")
+    armature = next(
+        (obj for obj in descendants(root) if obj.type == "ARMATURE"),
+        None,
+    )
+    if armature is None:
+        raise RuntimeError(f"{role} animated SMG kit is missing its armature")
+    left_wrist = armature.matrix_world @ armature.data.bones["L_wrist_03"].head_local
+    left_palm = armature.matrix_world @ armature.data.bones["L_palm_015"].head_local
+    trim_mesh_to_wrist(arms, left_wrist, left_palm, float(spec["cuff_length"]))
     material_variant(role, arms, spec)
+    soften_normals(arms)
     for obj in descendants(root):
         if obj.animation_data is None:
             continue
@@ -254,20 +533,165 @@ def deform_animated_smg(root: bpy.types.Object, role: str) -> None:
             track.name = "reload"
     bpy.context.scene.frame_start = 0
     bpy.context.scene.frame_end = 240
-    # The animated source has skinned geometry. Its sleeve silhouette is
-    # corrected in build_compact_first_person_hands.py; do not edit rest-space
-    # vertices here or the reload pose can develop skinning spikes.
 
 
-def duplicate_tree(root: bpy.types.Object, parent: bpy.types.Object, name: str) -> bpy.types.Object:
-    copy = root.copy()
-    if root.data is not None:
-        copy.data = root.data.copy()
-    copy.name = name
-    parent.children.link(copy)
-    for child in root.children:
-        duplicate_tree(child, copy, child.name)
-    return copy
+def deform_animated_reload(root: bpy.types.Object, role: str) -> None:
+    """Inflate and shorten the skinned moving crops while preserving the rig."""
+    spec = dict(ROLE_SPECS[role])
+    armature = next(
+        (obj for obj in descendants(root) if obj.type == "ARMATURE"),
+        None,
+    )
+    if armature is None:
+        raise RuntimeError(f"{role} reload kit is missing its armature")
+
+    def rest_bone_point(name: str, head: bool) -> Vector:
+        bone = armature.data.bones[name]
+        point = bone.head_local if head else bone.tail_local
+        return armature.matrix_world @ point
+
+    wrist = rest_bone_point("L_wrist_03", True)
+    elbow = rest_bone_point("L_elbow_02", True)
+    palm = rest_bone_point("L_palm_015", True)
+    forearm_axis = (wrist - elbow).normalized()
+    palm_axis = (palm - wrist).normalized()
+    cuff_length = float(spec["cuff_length"])
+    sleeve_inflate = float(spec["sleeve_inflate"])
+    glove_scale = float(spec["glove_scale"])
+
+    audit_mesh = find_object(root, "FullReloadArmsAuditMesh")
+    shape_reload_mesh(
+        audit_mesh,
+        wrist,
+        palm,
+        forearm_axis,
+        palm_axis,
+        cuff_length,
+        sleeve_inflate,
+        glove_scale,
+        role,
+        spec,
+    )
+
+    # The source crop meshes were cut farther up the sleeve. Re-cut both
+    # runtime crops from the shaped full audit mesh so the short cuff has one
+    # clean, closed Blender-authored boundary instead of bisecting an older
+    # cap and leaving a two-point seam.
+    for name in (
+        "LongGunReloadForearmsMesh",
+        "SidearmReloadForearmsMesh",
+    ):
+        mesh = find_object(root, name)
+        mesh.data = audit_mesh.data.copy()
+        mesh.data.name = f"{name}Data"
+        delete_right_arm_geometry(mesh)
+        trim_mesh_to_wrist(mesh, wrist, palm, cuff_length)
+        hand_weights = vertex_group_weights(mesh)
+        glove_polygons = {
+            polygon.index
+            for polygon in mesh.data.polygons
+            if sum(
+                hand_weights.get(vertex_index, 0.0)
+                for vertex_index in polygon.vertices
+            ) / max(1, len(polygon.vertices)) >= 0.30
+        }
+        material_variant(role, mesh, spec, glove_polygons)
+        assign_cuff_band(mesh, wrist, forearm_axis, cuff_length)
+        soften_normals(mesh)
+
+
+def shape_reload_mesh(
+    mesh: bpy.types.Object,
+    wrist: Vector,
+    palm: Vector,
+    forearm_axis: Vector,
+    palm_axis: Vector,
+    cuff_length: float,
+    sleeve_inflate: float,
+    glove_scale: float,
+    role: str,
+    spec: dict[str, object],
+) -> None:
+    hand_weights = vertex_group_weights(mesh)
+    inverse = mesh.matrix_world.inverted()
+    for vertex in mesh.data.vertices:
+        point = mesh.matrix_world @ vertex.co
+        hand_weight = hand_weights.get(vertex.index, 0.0)
+        if hand_weight >= 0.30:
+            offset = point - palm
+            axial = palm_axis * offset.dot(palm_axis)
+            radial = offset - axial
+            point = palm + axial * 1.06 + radial * glove_scale
+        else:
+            offset = point - wrist
+            axial = forearm_axis * offset.dot(forearm_axis)
+            radial = offset - axial
+            distance_from_wrist = max(0.0, -offset.dot(forearm_axis))
+            cuff_blend = smoothstep(
+                distance_from_wrist / max(cuff_length, 0.001)
+            )
+            radius_scale = 1.07 + (sleeve_inflate - 1.07) * cuff_blend
+            point = wrist + axial + radial * radius_scale
+        vertex.co = inverse @ point
+    mesh.data.update()
+    glove_polygons = {
+        polygon.index
+        for polygon in mesh.data.polygons
+        if sum(
+            hand_weights.get(vertex_index, 0.0)
+            for vertex_index in polygon.vertices
+        ) / max(1, len(polygon.vertices)) >= 0.30
+    }
+    material_variant(role, mesh, spec, glove_polygons)
+    assign_cuff_band(mesh, wrist, forearm_axis, cuff_length)
+    soften_normals(mesh)
+
+
+def delete_right_arm_geometry(mesh: bpy.types.Object) -> None:
+    left_groups = {
+        group.index
+        for group in mesh.vertex_groups
+        if group.name.startswith("L_")
+    }
+    right_groups = {
+        group.index
+        for group in mesh.vertex_groups
+        if group.name.startswith("R_")
+    }
+    right_vertices = []
+    for vertex in mesh.data.vertices:
+        left_weight = sum(
+            assignment.weight
+            for assignment in vertex.groups
+            if assignment.group in left_groups
+        )
+        right_weight = sum(
+            assignment.weight
+            for assignment in vertex.groups
+            if assignment.group in right_groups
+        )
+        if right_weight > left_weight:
+            right_vertices.append(vertex.index)
+
+    if not right_vertices:
+        raise RuntimeError(
+            f"{mesh.name} reload crop did not find right-arm geometry"
+        )
+
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh.data)
+        bm.verts.ensure_lookup_table()
+        bmesh.ops.delete(
+            bm,
+            geom=[bm.verts[index] for index in right_vertices],
+            context="VERTS",
+        )
+        bm.normal_update()
+        bm.to_mesh(mesh.data)
+        mesh.data.update()
+    finally:
+        bm.free()
 
 
 def prefix_tree(root: bpy.types.Object, role: str) -> None:
@@ -277,7 +701,11 @@ def prefix_tree(root: bpy.types.Object, role: str) -> None:
         obj.name = prefix + base_name
 
 
-def import_family(family: str, role: str, role_root: bpy.types.Object) -> bpy.types.Object:
+def import_family(
+    family: str,
+    role: str,
+    role_root: bpy.types.Object,
+) -> bpy.types.Object:
     path = FAMILY_SOURCES[family]
     if not path.exists():
         raise FileNotFoundError(path)
@@ -290,16 +718,22 @@ def import_family(family: str, role: str, role_root: bpy.types.Object) -> bpy.ty
     source_root.parent = role_root
     if family == "Smg":
         deform_animated_smg(source_root, role)
+    elif family == "Reload":
+        deform_animated_reload(source_root, role)
     else:
         deform_static_arms(source_root, role)
-    prefix_tree(source_root, role)
+    # Reload animation paths are authored against the exact node names in the
+    # arms-only source. Keep that subtree unprefixed; it is extracted as one
+    # role-owned family at runtime, so sibling role kits cannot collide.
+    if family != "Reload":
+        prefix_tree(source_root, role)
     return source_root
 
 
-def build_ladder_variant(role: str, role_root: bpy.types.Object) -> bpy.types.Object:
-    # Use the rifle's authored hand mesh as the licensed base, then place each
-    # hand around a dedicated rail-grip pose. The runtime only adds a small
-    # alternating vertical reach while climbing.
+def build_ladder_variant(
+    role: str,
+    role_root: bpy.types.Object,
+) -> bpy.types.Object:
     source_path = FAMILY_SOURCES["Rifle"]
     existing = set(bpy.context.scene.objects)
     bpy.ops.import_scene.gltf(filepath=str(source_path))
@@ -315,12 +749,8 @@ def build_ladder_variant(role: str, role_root: bpy.types.Object) -> bpy.types.Ob
     ):
         arm = find_object(source_root, f"{side}Arm")
         palm = find_object(source_root, f"{side}PalmFrame").matrix_world.translation
-        wrist = find_object(source_root, f"{side}WristFrame").matrix_world.translation
         arm.location += target - palm
         arm.rotation_euler.z += 0.10 if side == "Left" else -0.10
-        # The mesh stays close to the hand marker; this reduces the floating
-        # palm look caused by translating the whole arm after export.
-        _ = wrist
     prefix_tree(source_root, role)
     return source_root
 
@@ -334,9 +764,15 @@ def main() -> None:
 
     for role in ROLE_SPECS:
         role_root = bpy.data.objects.new(role, None)
-        role_root.parent = scene_root
         bpy.context.scene.collection.objects.link(role_root)
-        for family in ("Rifle", "PistolService", "PistolLarge", "Smg"):
+        role_root.parent = scene_root
+        for family in (
+            "Rifle",
+            "PistolService",
+            "PistolLarge",
+            "Smg",
+            "Reload",
+        ):
             import_family(family, role, role_root)
         build_ladder_variant(role, role_root)
 
@@ -362,8 +798,7 @@ def main() -> None:
         export_image_format="AUTO",
         export_yup=True,
     )
-    print(f"Wrote {OUT_BLEND}")
-    print(f"Wrote {OUT_GLB}")
+    print(f"OPERATOR_HAND_KITS_PASS blend={OUT_BLEND} glb={OUT_GLB}")
 
 
 if __name__ == "__main__":

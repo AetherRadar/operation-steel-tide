@@ -19,6 +19,12 @@ public partial class TacticalPlayer
     private const float AuthoredLargeSidearmArmPitchRadians = 0.45f;
     private const float AuthoredLargeSidearmAdsArmPresentationScale = 0.42f;
     private const float AuthoredLargeSidearmAdsArmPitchRadians = 0.82f;
+    private const float AnimatedScarReloadArmPresentationScale = 0.80f;
+    private const float AnimatedAwmReloadArmPresentationScale = 0.75f;
+    private const float AnimatedSidearmReloadArmPresentationScale = 0.64f;
+    private const float AnimatedSidearmReloadArmPitchRadians = 0.30f;
+    private const float AnimatedLargeSidearmReloadArmPresentationScale = 0.58f;
+    private const float AnimatedLargeSidearmReloadArmPitchRadians = 0.45f;
     private const float SidearmBottomScreenBandStartRatio = 0.96f;
     private const float MaxAuthoredPalmSurfaceGap = 0.018f;
     internal const float MaxServicePistolSupportArmCorrection = 0.03f;
@@ -705,6 +711,10 @@ public partial class TacticalPlayer
         if (EquippedWeapon.Platform != WeaponPlatform.M3A1)
         {
             EnsureAuthoredArmsForPlatform();
+            if (UsesRifleAnimatedReloadArms(EquippedWeapon.Platform))
+            {
+                EnsureAuthoredAnimatedReloadArms();
+            }
         }
         if (useAuthoredSmg)
         {
@@ -1074,6 +1084,10 @@ public partial class TacticalPlayer
 
     private void UpdateAuthoredReloadSupportArm()
     {
+        if (UpdateAnimatedReloadArmsPresentation())
+        {
+            return;
+        }
         if (!_isReloading)
         {
             // ADS can change without rebuilding the authored weapon. Refresh the

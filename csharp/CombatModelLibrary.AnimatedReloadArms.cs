@@ -20,38 +20,67 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     {
         Root = root;
         Skeleton = CombatModelLibrary.RequireSkeleton(root);
-        AnimationPlayer = CombatModelLibrary.RequireAnimationPlayer(root);
-        // ReloadArmsMesh is a visibility-only compatibility layer retained for
-        // existing diagnostics. Runtime geometry is always one of the two
-        // authored forearm crops below; the complete arms are audit-only.
-        FullMesh = CombatModelLibrary.RequireNode(root, "ReloadArmsMesh");
-        LongGunForearmsMesh = CombatModelLibrary.RequireNode(
+        var importedAnimationPlayer =
+            CombatModelLibrary.RequireAnimationPlayer(root);
+        AnimationPlayer = CreateRoleAnimationPlayer(
             root,
-            "LongGunReloadForearmsMesh");
-        SidearmForearmsMesh = CombatModelLibrary.RequireNode(
+            importedAnimationPlayer,
+            Skeleton);
+        LongGunForearmsMesh = CombatModelLibrary.RequireNodeEnding(
             root,
-            "SidearmReloadForearmsMesh");
-        FullAuditMesh = CombatModelLibrary.RequireNode(
+            "LongGunReloadForearmsMesh",
+            includeHidden: true);
+        SidearmForearmsMesh = CombatModelLibrary.RequireNodeEnding(
             root,
-            "FullReloadArmsAuditMesh");
-        FullMesh.Visible = true;
+            "SidearmReloadForearmsMesh",
+            includeHidden: true);
+        FullAuditMesh = CombatModelLibrary.RequireNodeEnding(
+            root,
+            "FullReloadArmsAuditMesh",
+            includeHidden: true);
         LongGunForearmsMesh.Visible = true;
         SidearmForearmsMesh.Visible = false;
         FullAuditMesh.Visible = false;
-        RightGripFrame = CombatModelLibrary.RequireNode(root, "RightGripFrame");
-        SupportGripFrame = CombatModelLibrary.RequireNode(root, "SupportGripFrame");
-        RightPalmFrame = CombatModelLibrary.RequireNode(root, "RightPalmFrame");
-        LeftPalmFrame = CombatModelLibrary.RequireNode(root, "LeftPalmFrame");
-        LeftGripAnchorFrame = CombatModelLibrary.RequireNode(
+        RightGripFrame = CombatModelLibrary.RequireNodeEnding(
             root,
-            "LeftGripAnchorFrame");
-        LeftSidearmMagazineAnchorFrame = CombatModelLibrary.RequireNode(
+            "RightGripFrame",
+            includeHidden: true);
+        SupportGripFrame = CombatModelLibrary.RequireNodeEnding(
             root,
-            "LeftSidearmMagazineAnchorFrame");
-        RightWristFrame = CombatModelLibrary.RequireNode(root, "RightWristFrame");
-        LeftWristFrame = CombatModelLibrary.RequireNode(root, "LeftWristFrame");
-        RightShoulderFrame = CombatModelLibrary.RequireNode(root, "RightShoulderFrame");
-        LeftShoulderFrame = CombatModelLibrary.RequireNode(root, "LeftShoulderFrame");
+            "SupportGripFrame",
+            includeHidden: true);
+        RightPalmFrame = CombatModelLibrary.RequireNodeEnding(
+            root,
+            "RightPalmFrame",
+            includeHidden: true);
+        LeftPalmFrame = CombatModelLibrary.RequireNodeEnding(
+            root,
+            "LeftPalmFrame",
+            includeHidden: true);
+        LeftGripAnchorFrame = CombatModelLibrary.RequireNodeEnding(
+            root,
+            "LeftGripAnchorFrame",
+            includeHidden: true);
+        LeftSidearmMagazineAnchorFrame = CombatModelLibrary.RequireNodeEnding(
+            root,
+            "LeftSidearmMagazineAnchorFrame",
+            includeHidden: true);
+        RightWristFrame = CombatModelLibrary.RequireNodeEnding(
+            root,
+            "RightWristFrame",
+            includeHidden: true);
+        LeftWristFrame = CombatModelLibrary.RequireNodeEnding(
+            root,
+            "LeftWristFrame",
+            includeHidden: true);
+        RightShoulderFrame = CombatModelLibrary.RequireNodeEnding(
+            root,
+            "RightShoulderFrame",
+            includeHidden: true);
+        LeftShoulderFrame = CombatModelLibrary.RequireNodeEnding(
+            root,
+            "LeftShoulderFrame",
+            includeHidden: true);
         LeftShoulderBone = Skeleton.FindBone("L_arm_01");
         LeftElbowBone = Skeleton.FindBone("L_elbow_02");
         LeftWristBone = Skeleton.FindBone("L_wrist_03");
@@ -64,18 +93,87 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
                 continue;
             }
             var clipStem = FirstPersonReloadProfileCatalog.For(platform).ClipStem;
-            _leftElbowPoleFrames[platform] = CombatModelLibrary.RequireNode(
+            _leftElbowPoleFrames[platform] =
+                CombatModelLibrary.RequireNodeEnding(
                 root,
-                $"{clipStem}_ElbowPoleFrame");
+                $"{clipStem}_ElbowPoleFrame",
+                includeHidden: true);
         }
         ValidateContract();
+    }
+
+    private static AnimationPlayer CreateRoleAnimationPlayer(
+        Node3D root,
+        AnimationPlayer importedPlayer,
+        Skeleton3D targetSkeleton)
+    {
+        var player = new AnimationPlayer
+        {
+            Name = "RoleReloadAnimationPlayer",
+            RootNode = importedPlayer.RootNode,
+            CallbackModeProcess =
+                AnimationMixer.AnimationCallbackModeProcess.Manual
+        };
+        root.AddChild(player);
+
+        var skeletonPath = RelativePathFromRoot(root, targetSkeleton);
+        foreach (var libraryName in importedPlayer.GetAnimationLibraryList())
+        {
+            var sourceLibrary = importedPlayer.GetAnimationLibrary(libraryName);
+            var library = new AnimationLibrary();
+            foreach (var animationName in sourceLibrary.GetAnimationList())
+            {
+                var animation = (Animation)sourceLibrary
+                    .GetAnimation(animationName)
+                    .Duplicate(true);
+                RetargetAnimationTracks(
+                    animation,
+                    skeletonPath);
+                library.AddAnimation(animationName, animation);
+            }
+            player.AddAnimationLibrary(libraryName, library);
+        }
+
+        importedPlayer.Stop();
+        importedPlayer.ProcessMode = Node.ProcessModeEnum.Disabled;
+        return player;
+    }
+
+    private static string RelativePathFromRoot(Node root, Node target)
+    {
+        var segments = new List<string>();
+        var current = target;
+        while (!ReferenceEquals(current, root))
+        {
+            segments.Add(current.Name.ToString());
+            current = current.GetParent()
+                ?? throw new InvalidOperationException(
+                    $"Animation target {target.Name} is outside {root.Name}.");
+        }
+        segments.Reverse();
+        return string.Join("/", segments);
+    }
+
+    private static void RetargetAnimationTracks(
+        Animation animation,
+        string targetSkeletonPath)
+    {
+        for (var track = 0; track < animation.GetTrackCount(); track++)
+        {
+            var path = animation.TrackGetPath(track).ToString();
+            var separator = path.IndexOf(':');
+            var subname = separator >= 0
+                ? path[separator..]
+                : string.Empty;
+            animation.TrackSetPath(
+                track,
+                new NodePath(targetSkeletonPath + subname));
+        }
     }
 
     public Node3D Root { get; }
     public Skeleton3D Skeleton { get; }
     public AnimationPlayer AnimationPlayer { get; }
-    /// <summary>Compatibility visibility layer; it contains no geometry.</summary>
-    public Node3D FullMesh { get; }
     public Node3D LongGunForearmsMesh { get; }
     public Node3D SidearmForearmsMesh { get; }
     public Node3D FullAuditMesh { get; }
@@ -91,11 +189,6 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
         => LongGunForearmsMesh.Visible
             && !SidearmForearmsMesh.Visible
             && !FullAuditMesh.Visible;
-    // Compatibility name consumed by the existing TacticalPlayer diagnostic
-    // surface. It now means the non-sidearm authored reload presentation, not
-    // that the complete upper-arm audit mesh is rendered.
-    public bool UsesFullArms
-        => UsesLongGunForearms && FullMesh.Visible;
     public string PresentedClipName
         => _presentedClipName;
     public float PresentedClipProgress => _presentedClipProgress;
@@ -239,7 +332,6 @@ internal sealed class AuthoredAnimatedReloadArmsVisual
     public void SetPresentationPlatform(WeaponPlatform platform)
     {
         var sidearm = WeaponCatalog.IsSidearm(platform);
-        FullMesh.Visible = !sidearm;
         LongGunForearmsMesh.Visible = !sidearm;
         SidearmForearmsMesh.Visible = sidearm;
         FullAuditMesh.Visible = false;

@@ -254,6 +254,20 @@ internal static partial class CombatModelLibrary
         return new AuthoredFirstPersonSmgVisual(root);
     }
 
+    public static AuthoredAnimatedReloadArmsVisual InstantiateAnimatedReloadArms(
+        OperatorRole role = OperatorRole.Assault)
+    {
+        var root = InstantiateRoleFamily(
+            role,
+            "Reload",
+            "AuthoredAnimatedReloadArmsVisual");
+        foreach (var geometry in GeometryBelow(root))
+        {
+            geometry.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        }
+        return new AuthoredAnimatedReloadArmsVisual(root);
+    }
+
     public static AuthoredFirstPersonArmsVisual InstantiateFirstPersonRifleArms(OperatorRole role = OperatorRole.Assault)
         => InstantiateStaticFirstPersonArms(
             "Rifle",
@@ -284,9 +298,12 @@ internal static partial class CombatModelLibrary
         return new AuthoredFirstPersonArmsVisual(root);
     }
 
-    internal static Node3D RequireNodeEnding(Node3D root, string ending)
+    internal static Node3D RequireNodeEnding(
+        Node3D root,
+        string ending,
+        bool includeHidden = false)
     {
-        var node = FindNodeEnding(root, ending);
+        var node = FindNodeEnding(root, ending, includeHidden);
         return node ?? throw new InvalidOperationException(
             $"Combat model {root.Name} is missing required node ending {ending}.");
     }
@@ -325,12 +342,46 @@ internal static partial class CombatModelLibrary
                 }
             }
             kitRoot.Name = runtimeName;
-            FirstPersonHandAppearance.Apply(kitRoot, role);
             return kitRoot;
         }
-        var familyRoot = FindNodeEnding(roleRoot, family)
+        var familyRoot = FindNodeEnding(
+                roleRoot,
+                family,
+                includeHidden: string.Equals(
+                    family,
+                    "Reload",
+                    StringComparison.Ordinal))
             ?? throw new InvalidOperationException(
                 $"Operator hand kit {role} is missing family subtree {family}.");
+        if (string.Equals(family, "Reload", StringComparison.Ordinal))
+        {
+            // Reload clips are authored against the full imported hierarchy and
+            // the AnimationPlayer lives beside OperatorFirstPersonHandKits.
+            // Keep that hierarchy intact so Godot can resolve every track path.
+            var handKitsRoot = roleRoot.GetParent()
+                ?? throw new InvalidOperationException(
+                    $"Operator hand kit {role} has no role-family parent.");
+            foreach (var otherRole in handKitsRoot.GetChildren())
+            {
+                if (ReferenceEquals(otherRole, roleRoot))
+                {
+                    continue;
+                }
+                handKitsRoot.RemoveChild(otherRole);
+                otherRole.Free();
+            }
+            foreach (var otherFamily in roleRoot.GetChildren())
+            {
+                if (ReferenceEquals(otherFamily, familyRoot))
+                {
+                    continue;
+                }
+                roleRoot.RemoveChild(otherFamily);
+                otherFamily.Free();
+            }
+            kitRoot.Name = runtimeName;
+            return kitRoot;
+        }
         var extracted = new Node3D
         {
             Name = runtimeName
@@ -339,7 +390,6 @@ internal static partial class CombatModelLibrary
         familyRoot.GetParent()?.RemoveChild(familyRoot);
         extracted.AddChild(familyRoot);
         kitRoot.Free();
-        FirstPersonHandAppearance.Apply(extracted, role);
         return extracted;
     }
 
@@ -354,15 +404,18 @@ internal static partial class CombatModelLibrary
             _ => "Viper"
         };
 
-    private static Node3D? FindNodeEnding(Node root, string ending)
+    private static Node3D? FindNodeEnding(
+        Node root,
+        string ending,
+        bool includeHidden = false)
     {
         if (root is Node3D node
-            && node.Visible
+            && (includeHidden || node.Visible)
             && IsNodeNameEnding(node.Name.ToString(), ending))
         {
             return node;
         }
-        if (root is Node3D hidden && !hidden.Visible)
+        if (root is Node3D hidden && !includeHidden && !hidden.Visible)
         {
             return null;
         }
@@ -370,7 +423,7 @@ internal static partial class CombatModelLibrary
         using var childrenBacking = children.AsDisposable();
         foreach (var child in children)
         {
-            if (FindNodeEnding(child, ending) is { } match)
+            if (FindNodeEnding(child, ending, includeHidden) is { } match)
             {
                 return match;
             }

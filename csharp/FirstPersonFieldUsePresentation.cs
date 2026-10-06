@@ -40,9 +40,9 @@ internal sealed class FirstPersonFieldUsePresentation
 
     private readonly Node3D _root;
     private readonly AuthoredFieldUsePropsVisual _props;
-    private readonly AuthoredFirstPersonArmsVisual _arms;
-    private readonly Basis _primaryGripBasisOffset;
-    private readonly Basis _supportGripBasisOffset;
+    private AuthoredFirstPersonArmsVisual _arms = null!;
+    private Basis _primaryGripBasisOffset;
+    private Basis _supportGripBasisOffset;
     private FirstPersonFieldUsePresentationKind _kind;
     private float _progress;
     private Transform3D _primaryGripTarget;
@@ -60,33 +60,28 @@ internal sealed class FirstPersonFieldUsePresentation
 
         _props = CombatModelLibrary.InstantiateFieldUseProps();
         _root.AddChild(_props.Root);
-        _arms = CombatModelLibrary.InstantiateFirstPersonRifleArms(role);
-        _root.AddChild(_arms.Root);
-
         _props.ResetPose();
-        _arms.RightArm.Transform = Transform3D.Identity;
-        _arms.LeftArm.Transform = Transform3D.Identity;
-        var referencePrimary = MarkerTransform(_props.TraumaPrimaryGrip);
-        _primaryGripBasisOffset = referencePrimary.Basis.Orthonormalized().Inverse()
-            * ArmPresentationBasis;
-        var referencePrimaryTarget = new Transform3D(
-            ArmPresentationBasis.Scaled(Vector3.One * ArmPresentationScale),
-            referencePrimary.Origin);
-        _arms.Root.Transform = referencePrimaryTarget
-            * _arms.RightGripTransformInRoot.AffineInverse();
-        var referenceSupport = MarkerTransform(_props.TraumaLidGrip);
-        var authoredSupportBasis = (_arms.Root.Transform
-            * _arms.MarkerTransformInRoot(_arms.LeftGripFrame))
-            .Basis
-            .Orthonormalized();
-        _supportGripBasisOffset = referenceSupport.Basis.Orthonormalized().Inverse()
-            * authoredSupportBasis;
+        RebuildArms(role);
         Hide();
     }
 
     public bool Visible => _root.Visible;
 
-    public void SetRole(OperatorRole role) => FirstPersonHandAppearance.Apply(_arms.Root, role);
+    public void SetRole(OperatorRole role)
+    {
+        var wasVisible = _root.Visible;
+        var previousKind = _kind;
+        var previousProgress = _progress;
+        RebuildArms(role);
+        if (wasVisible)
+        {
+            Present(previousKind, previousProgress);
+        }
+        else
+        {
+            Hide();
+        }
+    }
 
     public void Present(FirstPersonFieldUsePresentationKind kind, float progress)
     {
@@ -364,6 +359,38 @@ internal sealed class FirstPersonFieldUsePresentation
         _supportGripTarget = new Transform3D(
             finalSupportGrip.Basis.Orthonormalized(),
             rawSupportTarget.Origin);
+    }
+
+    private void RebuildArms(OperatorRole role)
+    {
+        if (_arms is not null && GodotObject.IsInstanceValid(_arms.Root))
+        {
+            var oldRoot = _arms.Root;
+            oldRoot.GetParent()?.RemoveChild(oldRoot);
+            oldRoot.Free();
+        }
+
+        _arms = CombatModelLibrary.InstantiateFirstPersonRifleArms(role);
+        _root.AddChild(_arms.Root);
+        _arms.RightArm.Transform = Transform3D.Identity;
+        _arms.LeftArm.Transform = Transform3D.Identity;
+
+        var referencePrimary = MarkerTransform(_props.TraumaPrimaryGrip);
+        _primaryGripBasisOffset = referencePrimary.Basis.Orthonormalized().Inverse()
+            * ArmPresentationBasis;
+        var referencePrimaryTarget = new Transform3D(
+            ArmPresentationBasis.Scaled(Vector3.One * ArmPresentationScale),
+            referencePrimary.Origin);
+        _arms.Root.Transform = referencePrimaryTarget
+            * _arms.RightGripTransformInRoot.AffineInverse();
+
+        var referenceSupport = MarkerTransform(_props.TraumaLidGrip);
+        var authoredSupportBasis = (_arms.Root.Transform
+            * _arms.MarkerTransformInRoot(_arms.LeftGripFrame))
+            .Basis
+            .Orthonormalized();
+        _supportGripBasisOffset = referenceSupport.Basis.Orthonormalized().Inverse()
+            * authoredSupportBasis;
     }
 
     private Transform3D GripTarget(Node3D marker, Vector3 offset, bool primary)
