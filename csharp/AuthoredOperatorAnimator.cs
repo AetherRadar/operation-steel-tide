@@ -192,6 +192,22 @@ internal sealed class AuthoredOperatorAnimator
         _visual.RefreshWeaponPose();
     }
 
+    public void SetTerminalDeathPose()
+    {
+        _overrideRemaining = 0.0f;
+        _hitCooldownRemaining = 0.0f;
+        _upperBodyAction.Cancel();
+        _overrideWeaponVersion = _visual.WeaponAttachmentVersion;
+        _current = "death";
+        _player.SpeedScale = 1.0f;
+        _player.Play("death", 0.0);
+        var deathLength = _player.GetAnimation("death").Length;
+        _player.Seek(Math.Max(0.0, deathLength - 0.001), update: true);
+        _player.Advance(0.0);
+        DeathPoseCompleted = true;
+        _visual.RefreshWeaponPose();
+    }
+
     public bool PlayHit()
     {
         if (_hitCooldownRemaining > 0.0f || IsPronePose(_current)

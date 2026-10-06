@@ -17,6 +17,9 @@ public partial class SquadMate
         => UsesAuthoredOperatorForDiagnostics
             ? _authoredOperatorAnimator.CurrentAnimation
             : string.Empty;
+    internal bool AuthoredDeathPoseCompletedForDiagnostics
+        => UsesAuthoredOperatorForDiagnostics
+            && _authoredOperatorAnimator.DeathPoseCompleted;
     internal int AuthoredAnimationCountForDiagnostics
         => UsesAuthoredOperatorForDiagnostics
             ? _authoredOperatorAnimator.AnimationCount
@@ -63,6 +66,11 @@ public partial class SquadMate
         _authoredAimHoldRemaining = 0.0f;
         _revivePoseBlend = 0.0f;
         _authoredOperatorVisual.SetWeaponReadied(false);
+        if (ReviveUsed)
+        {
+            _authoredOperatorAnimator.SetTerminalDeathPose();
+            return;
+        }
         _authoredOperatorAnimator.Update(
             0.0f,
             0.0f,
@@ -70,9 +78,9 @@ public partial class SquadMate
             prone: false,
             crouched: false,
             aiming: false,
-            downed: !ReviveUsed,
+            downed: true,
             reviving: false,
-            dead: ReviveUsed);
+            dead: false);
     }
 
     internal void SetDemolitionRoundFrozenPose()

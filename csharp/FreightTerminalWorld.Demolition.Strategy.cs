@@ -938,6 +938,16 @@ public partial class FreightTerminalWorld
             _demolitionCombatBreakoffs.Remove(opponent);
             return true;
         }
+        if (opponent == _demolitionDefuser
+            && _demolitionDefuseProgress > 0.0f
+            && !opponent.HasRecentDamageThreat)
+        {
+            // Once the defuser has committed to the channel, a nearby sighted
+            // opponent must not make it oscillate forever between combat and
+            // defuse. A direct hit above still interrupts immediately.
+            _demolitionCombatBreakoffs.Remove(opponent);
+            return true;
+        }
         var channeling = IsDemolitionOpponentChanneling(opponent);
         if (channeling && targetDistance >= DemolitionChannelGuardRange)
         {
